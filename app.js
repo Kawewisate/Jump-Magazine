@@ -23,6 +23,7 @@ const el = {
   settingsForm: document.getElementById('settings-form'),
   settingsApiKey: document.getElementById('settings-apikey'),
   settingsModel: document.getElementById('settings-model'),
+  modelChips: document.querySelectorAll('.model-chip'),
   settingsReasoning: document.getElementById('settings-reasoning'),
   settingsCancel: document.getElementById('settings-cancel'),
   printOverlay: document.getElementById('print-overlay'),
@@ -49,6 +50,13 @@ function wireEvents() {
   el.settingsForm.addEventListener('submit', onSaveSettings);
   el.printClose.addEventListener('click', closePrintPreview);
   el.printBtn.addEventListener('click', () => window.print());
+  el.modelChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      el.settingsModel.value = chip.dataset.model;
+      updateModelChipHighlight();
+    });
+  });
+  el.settingsModel.addEventListener('input', updateModelChipHighlight);
   el.chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -547,11 +555,18 @@ function updateExerciseCardFooter(level) {
 
 // ---------- Settings modal ----------
 
+function updateModelChipHighlight() {
+  el.modelChips.forEach((chip) => {
+    chip.classList.toggle('active', chip.dataset.model === el.settingsModel.value.trim());
+  });
+}
+
 function openSettingsModal() {
   const s = getSettings();
   el.settingsApiKey.value = s.apiKey;
   el.settingsModel.value = s.model;
   el.settingsReasoning.value = s.reasoningEffort;
+  updateModelChipHighlight();
   el.settingsModal.classList.remove('hidden');
 }
 

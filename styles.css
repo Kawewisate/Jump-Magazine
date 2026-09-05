@@ -414,6 +414,31 @@ button {
 
 .modal-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
+.model-quick-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.model-chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.model-chip:hover { background: #fff; }
+
+.model-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
 .modal-actions {
   margin-top: 20px;
   display: flex;

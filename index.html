@@ -53,6 +53,12 @@
 
       <label for="settings-model">Model</label>
       <input type="text" id="settings-model" />
+      <div class="model-quick-select">
+        <button type="button" class="model-chip" data-model="deepseek/deepseek-v4-flash-0731">DeepSeek V4 Flash (หลัก)</button>
+        <button type="button" class="model-chip" data-model="google/gemma-4-31b-it:free">Gemma 4 31B (ฟรี)</button>
+        <button type="button" class="model-chip" data-model="minimax/minimax-m3:free">MiniMax M3 (ฟรี)</button>
+      </div>
+      <div class="modal-hint">โมเดลที่มีคำว่า (ฟรี) คือโมเดลฟรีสำรองไว้ใช้ยามฉุกเฉิน กรณีเครดิต OpenRouter ของโมเดลหลักหมด — คุณภาพและความแม่นยำ (โดยเฉพาะสูตร LaTeX และภาษาไทย) อาจสู้โมเดลหลักไม่ได้</div>
 
       <label for="settings-reasoning">Reasoning effort</label>
       <select id="settings-reasoning">
