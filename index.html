@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ผู้ช่วยครู AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-header"><h1>🧑‍🏫 ผู้ช่วยครู AI</h1></div>
+    <button id="btn-new-lesson" class="mode-btn">🎨 ออกแบบสื่อการสอน</button>
+    <button id="btn-new-exercise" class="mode-btn">📝 ออกแบบแบบฝึกหัด</button>
+    <div class="sidebar-section-title">ประวัติงาน</div>
+    <div id="session-list"></div>
+    <button id="btn-settings" class="settings-btn">⚙️ ตั้งค่า</button>
+  </aside>
+
+  <main id="main-panel">
+    <div id="welcome-screen">
+      <h2>ยินดีต้อนรับครับ/ค่ะ 👋</h2>
+      <p>เลือกโหมดทางซ้ายเพื่อเริ่มงานใหม่ — "ออกแบบสื่อการสอน" หรือ "ออกแบบแบบฝึกหัด"</p>
+    </div>
+
+    <div id="chat-view" class="hidden">
+      <div id="chat-header"><span id="session-title-display"></span></div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-area">
+        <div id="attach-chip" class="hidden"></div>
+        <form id="chat-form">
+          <button type="button" id="attach-btn" title="แนบไฟล์">📎</button>
+          <input type="file" id="attach-input" hidden accept=".pdf,.docx,.txt" />
+          <textarea id="chat-input" rows="1" placeholder="พิมพ์ข้อความ... (Enter เพื่อส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
+          <button type="submit" id="send-btn">➤</button>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>⚙️ ตั้งค่า</h2>
+    <form id="settings-form">
+      <label for="settings-apikey">OpenRouter API key</label>
+      <input type="password" id="settings-apikey" placeholder="sk-or-v1-..." autocomplete="off" />
+      <div class="modal-hint">Key จะถูกเก็บไว้ใน localStorage ของเบราว์เซอร์นี้เท่านั้น ไม่ถูกส่งไปที่ใดนอกจาก OpenRouter โดยตรง<br>ยังไม่มี key? ขอได้ฟรีที่ <strong>openrouter.ai/keys</strong></div>
+
+      <label for="settings-model">Model</label>
+      <input type="text" id="settings-model" />
+
+      <label for="settings-reasoning">Reasoning effort</label>
+      <select id="settings-reasoning">
+        <option value="low">low</option>
+        <option value="medium">medium</option>
+        <option value="high">high</option>
+      </select>
+
+      <div class="modal-actions">
+        <button type="button" id="settings-cancel" class="btn-secondary">ยกเลิก</button>
+        <button type="submit" class="btn-primary">บันทึก</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="print-overlay" class="print-overlay hidden">
+  <div class="print-toolbar no-print">
+    <button id="print-close">✕ ปิด</button>
+    <button id="print-btn">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+  </div>
+  <div id="print-page">
+    <h1 id="print-title"></h1>
+    <div id="print-body"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
+
+<script src="storage.js"></script>
+<script src="api.js"></script>
+<script src="fileparse.js"></script>
+<script src="print.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
