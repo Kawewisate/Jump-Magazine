@@ -546,14 +546,18 @@ button {
 /* ---------- Print media ---------- */
 
 @media print {
-  body * { visibility: hidden; }
-  #print-overlay, #print-overlay * { visibility: visible; }
+  /* ซ่อนแอปทั้งหมดด้วย display:none (ไม่ใช่ visibility) เพื่อไม่ให้ความสูงของ
+     sidebar/ประวัติแชททั้งหมดที่ซ่อนอยู่ไปกวนการแบ่งหน้าพิมพ์ของเบราว์เซอร์ —
+     สาเหตุที่ PDF เดิมออกมาหลายหน้าเกินจริง/เนื้อหาขาดๆ หายๆ */
+  #app, #settings-modal { display: none !important; }
+
   #print-overlay {
-    position: absolute;
-    top: 0; left: 0;
+    position: static;
+    overflow: visible;
     background: #fff;
     padding: 0;
     width: auto;
+    min-height: 0;
   }
   #print-page {
     box-shadow: none;
@@ -563,6 +567,10 @@ button {
     padding: 0;
   }
   .no-print { display: none !important; }
+}
+
+@page {
+  margin: 15mm;
 }
 
 /* ---------- Mobile / tablet (phone + iPad) ---------- */
