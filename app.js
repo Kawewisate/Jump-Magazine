@@ -52,7 +52,7 @@ function wireEvents() {
   el.settingsCancel.addEventListener('click', closeSettingsModal);
   el.settingsForm.addEventListener('submit', onSaveSettings);
   el.printClose.addEventListener('click', closePrintPreview);
-  el.printBtn.addEventListener('click', () => window.print());
+  el.printBtn.addEventListener('click', exportPdf);
   el.modelChips.forEach((chip) => {
     chip.addEventListener('click', () => {
       el.settingsModel.value = chip.dataset.model;
@@ -556,7 +556,7 @@ function updateExerciseCardFooter(level) {
     if (set.status === 'done') {
       const pdfBtn = document.createElement('button');
       pdfBtn.className = 'pdf-btn';
-      pdfBtn.textContent = '📄 ดู/พิมพ์ PDF';
+      pdfBtn.textContent = '📄 ดู/บันทึก PDF';
       pdfBtn.addEventListener('click', () =>
         openPrintPreview(`${currentSession.title || 'แบบฝึกหัด'} — ${EXERCISE_LEVEL_LABELS[level]}`, set.content)
       );
