@@ -29,6 +29,9 @@ const el = {
   printOverlay: document.getElementById('print-overlay'),
   printClose: document.getElementById('print-close'),
   printBtn: document.getElementById('print-btn'),
+  sidebar: document.getElementById('sidebar'),
+  sidebarBackdrop: document.getElementById('sidebar-backdrop'),
+  hamburgerBtn: document.getElementById('hamburger-btn'),
 };
 
 function init() {
@@ -57,6 +60,8 @@ function wireEvents() {
     });
   });
   el.settingsModel.addEventListener('input', updateModelChipHighlight);
+  el.hamburgerBtn.addEventListener('click', openSidebarDrawer);
+  el.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
   el.chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -99,14 +104,26 @@ function selectSession(id) {
   const session = getSessions().find((s) => s.id === id);
   if (!session) return;
   closePrintPreview();
+  closeSidebarDrawer();
   currentSession = session;
   showChatView();
   renderSessionList();
   renderChatView();
 }
 
+function openSidebarDrawer() {
+  el.sidebar.classList.add('open');
+  el.sidebarBackdrop.classList.add('show');
+}
+
+function closeSidebarDrawer() {
+  el.sidebar.classList.remove('open');
+  el.sidebarBackdrop.classList.remove('show');
+}
+
 function newSession(mode) {
   closePrintPreview();
+  closeSidebarDrawer();
   currentSession = {
     id: createSessionId(),
     mode,
