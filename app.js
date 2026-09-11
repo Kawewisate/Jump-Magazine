@@ -1,8 +1,11 @@
 // ตัวควบคุมหลักของแอป: sidebar/session, การเดินเรื่องของโหมด 1 และโหมด 2, การเชื่อม settings
 
-let currentSession = null;
+let currentSession = null; // session ที่เปิดดูอยู่
+let activeSession = null; // session ที่กำลังเจนอยู่ (ผู้ใช้อาจสลับไปดูงานอื่นระหว่างรอได้)
 let isBusy = false;
 let pendingAttachment = null; // { name, text }
+let isReadingAttachment = false;
+let attachReadSeq = 0; // กันผลอ่านไฟล์เก่ามาทับ เมื่อเลือกไฟล์ใหม่/เปลี่ยนงานระหว่างอ่าน
 
 const el = {
   sessionList: document.getElementById('session-list'),
@@ -63,7 +66,7 @@ function wireEvents() {
   el.hamburgerBtn.addEventListener('click', openSidebarDrawer);
   el.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
   el.chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       el.chatForm.requestSubmit();
     }
@@ -87,6 +90,10 @@ function renderSessionList() {
     });
     item.querySelector('.session-delete').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isBusy && activeSession && activeSession.id === s.id) {
+        alert('งานนี้กำลังสร้างเนื้อหาอยู่ รอให้เสร็จก่อนแล้วค่อยลบ');
+        return;
+      }
       if (confirm('ลบงานนี้ออกจากประวัติ?')) {
         deleteSession(s.id);
         if (currentSession && currentSession.id === s.id) {
@@ -101,14 +108,31 @@ function renderSessionList() {
 }
 
 function selectSession(id) {
-  const session = getSessions().find((s) => s.id === id);
-  if (!session) return;
   closePrintPreview();
   closeSidebarDrawer();
+  // กดงานที่เปิดอยู่แล้ว: ไม่ต้องโหลดใหม่จาก storage (สำเนาใน storage อาจเก่ากว่าที่กำลังเจนอยู่)
+  if (currentSession && currentSession.id === id) return;
+  const session =
+    activeSession && activeSession.id === id ? activeSession : getSessions().find((s) => s.id === id);
+  if (!session) return;
+  if (session !== activeSession) recoverInterruptedSession(session);
   currentSession = session;
+  clearPendingAttachment();
   showChatView();
   renderSessionList();
   renderChatView();
+}
+
+// งานที่ถูกขัดจังหวะกลางคัน (เช่น รีโหลด/ปิดหน้าระหว่างเจน) จะค้างสถานะ pending/streaming ไว้ใน storage
+// แปลงเป็น error เพื่อให้มีปุ่ม "สร้างใหม่ชุดนี้" กดต่อได้
+function recoverInterruptedSession(session) {
+  if (session.mode !== 'exercise' || !session.exerciseSets) return;
+  for (const set of Object.values(session.exerciseSets)) {
+    if (set.status === 'pending' || set.status === 'streaming') {
+      set.status = 'error';
+      set.content = '⚠️ การสร้างถูกขัดจังหวะ กด "สร้างใหม่ชุดนี้" เพื่อลองอีกครั้ง';
+    }
+  }
 }
 
 function openSidebarDrawer() {
@@ -133,6 +157,7 @@ function newSession(mode) {
     finalGenerated: false,
     exerciseSets: mode === 'exercise' ? {} : undefined,
   };
+  clearPendingAttachment();
   showChatView();
   renderChatView();
   renderSessionList();
@@ -149,9 +174,9 @@ function showChatView() {
   el.chatView.classList.remove('hidden');
 }
 
-function persistCurrentSession() {
-  if (!currentSession) return;
-  upsertSession(currentSession);
+function persistSession(session) {
+  if (!session) return;
+  upsertSession(session);
   renderSessionList();
 }
 
@@ -161,31 +186,53 @@ async function onAttachFile(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  const readId = ++attachReadSeq;
+  isReadingAttachment = true;
+  pendingAttachment = null;
   el.attachChip.classList.remove('hidden');
   el.attachChip.textContent = `📎 กำลังอ่านไฟล์ ${file.name} ...`;
+
+  let text = '';
+  let error = null;
   try {
-    const text = await extractTextFromFile(file);
-    pendingAttachment = { name: file.name, text };
-    renderAttachChip();
+    text = await extractTextFromFile(file);
   } catch (err) {
-    pendingAttachment = null;
-    el.attachChip.classList.add('hidden');
-    alert('อ่านไฟล์ไม่สำเร็จ: ' + err.message);
+    error = err;
   }
+  if (readId !== attachReadSeq) return; // มีการเลือกไฟล์ใหม่หรือเปลี่ยนงานไประหว่างอ่าน
+  isReadingAttachment = false;
+  if (!error && !text) {
+    error = new Error('ไม่พบข้อความในไฟล์ (ถ้าเป็น PDF ที่สแกนมาเป็นรูปภาพ ระบบยังอ่านไม่ได้)');
+  }
+  pendingAttachment = error ? null : { name: file.name, text };
+  renderAttachChip();
+  if (error) alert('อ่านไฟล์ไม่สำเร็จ: ' + error.message);
+}
+
+function clearPendingAttachment() {
+  attachReadSeq++;
+  isReadingAttachment = false;
+  pendingAttachment = null;
+  renderAttachChip();
 }
 
 function renderAttachChip() {
+  el.attachChip.innerHTML = '';
   if (!pendingAttachment) {
     el.attachChip.classList.add('hidden');
-    el.attachChip.innerHTML = '';
     return;
   }
   el.attachChip.classList.remove('hidden');
-  el.attachChip.innerHTML = `📎 ${pendingAttachment.name} (${pendingAttachment.text.length.toLocaleString()} ตัวอักษร) <button type="button" id="attach-remove">✕</button>`;
-  document.getElementById('attach-remove').addEventListener('click', () => {
-    pendingAttachment = null;
-    renderAttachChip();
-  });
+  // ใช้ text node — ชื่อไฟล์มาจากผู้ใช้ ห้ามยัดลง innerHTML
+  el.attachChip.append(
+    `📎 ${pendingAttachment.name} (${pendingAttachment.text.length.toLocaleString()} ตัวอักษร) `
+  );
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.id = 'attach-remove';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', clearPendingAttachment);
+  el.attachChip.appendChild(removeBtn);
 }
 
 // ---------- Chat rendering ----------
@@ -235,6 +282,9 @@ function buildMessageBubble(msg, idx) {
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
 
+  const isLastMsg = idx === currentSession.messages.length - 1;
+  const generatingHere = isBusy && activeSession === currentSession;
+
   if (msg.role === 'user') {
     bubble.textContent = msg.displayContent || msg.content;
     if (msg.attachmentName) {
@@ -242,6 +292,17 @@ function buildMessageBubble(msg, idx) {
       chip.className = 'attach-tag';
       chip.textContent = `📎 ${msg.attachmentName}`;
       bubble.appendChild(chip);
+    }
+    // ข้อความสุดท้ายเป็นของครูแต่ไม่มีคำตอบ = การเจนถูกขัดจังหวะ (เช่น รีโหลดหน้า) ให้กดขอคำตอบใหม่ได้
+    if (currentSession.mode === 'lesson' && isLastMsg && !generatingHere) {
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'regen-btn retry-reply-btn';
+      retryBtn.textContent = '🔄 ให้ AI ตอบอีกครั้ง';
+      retryBtn.addEventListener('click', () => {
+        if (isBusy) return;
+        runLessonCompletion(msg.content === CONFIRM_TRIGGER_MESSAGE);
+      });
+      bubble.appendChild(retryBtn);
     }
   } else if (msg.isError) {
     const errDiv = document.createElement('div');
@@ -262,19 +323,25 @@ function buildMessageBubble(msg, idx) {
     }
     const content = document.createElement('div');
     content.className = 'markdown-body';
-    renderMarkdownWithMath(content, msg.content);
-    bubble.appendChild(content);
+    if (generatingHere && isLastMsg) {
+      // กลับมาดูงานที่ยังเจนไม่เสร็จ: แสดงแบบ streaming ต่อ ยังไม่ต้องโชว์ปุ่มยืนยัน/PDF
+      content.classList.add('streaming');
+      content.textContent = msg.content;
+      bubble.appendChild(content);
+    } else {
+      renderMarkdownWithMath(content, msg.content);
+      bubble.appendChild(content);
 
-    const isLastMsg = idx === currentSession.messages.length - 1;
-    if (currentSession.mode === 'lesson' && isLastMsg && !currentSession.finalGenerated && msg.content) {
-      bubble.appendChild(buildConfirmControls());
-    }
-    if (msg.showPdfButton) {
-      const btn = document.createElement('button');
-      btn.className = 'pdf-btn';
-      btn.textContent = '📄 ดูตัวอย่าง PDF';
-      btn.addEventListener('click', () => openPrintPreview(currentSession.title || 'เนื้อหาการสอน', msg.content));
-      bubble.appendChild(btn);
+      if (currentSession.mode === 'lesson' && isLastMsg && !currentSession.finalGenerated && msg.content) {
+        bubble.appendChild(buildConfirmControls());
+      }
+      if (msg.showPdfButton) {
+        const btn = document.createElement('button');
+        btn.className = 'pdf-btn';
+        btn.textContent = '📄 ดูตัวอย่าง PDF';
+        btn.addEventListener('click', () => openPrintPreview(currentSession.title || 'เนื้อหาการสอน', msg.content));
+        bubble.appendChild(btn);
+      }
     }
   }
 
@@ -304,6 +371,10 @@ function onFormSubmit(e) {
   if (isBusy || !currentSession) return;
   const text = el.chatInput.value.trim();
   if (!text) return;
+  if (isReadingAttachment) {
+    alert('กำลังอ่านไฟล์แนบอยู่ รอสักครู่แล้วค่อยกดส่งอีกครั้ง');
+    return;
+  }
 
   const attachment = pendingAttachment;
   el.chatInput.value = '';
@@ -339,7 +410,7 @@ function sendLessonTurn(userText, attachment, isConfirmTrigger) {
   };
   currentSession.messages.push(userMsg);
   renderChatView();
-  persistCurrentSession();
+  persistSession(currentSession);
 
   runLessonCompletion();
 }
@@ -353,22 +424,33 @@ function confirmLessonPlan() {
   };
   currentSession.messages.push(userMsg);
   renderChatView();
-  persistCurrentSession();
+  persistSession(currentSession);
   runLessonCompletion(true);
 }
 
 function runLessonCompletion(isFinalStep) {
+  // ผูกกับ session ที่เริ่มเจน ไม่ใช่ currentSession — ผู้ใช้อาจสลับไปดูงานอื่นระหว่างรอ
+  const session = currentSession;
+  activeSession = session;
   setBusy(true);
   const apiMessages = [
     { role: 'system', content: buildLessonSystemPrompt() },
-    ...currentSession.messages.filter((m) => !m.isError).map((m) => ({ role: m.role, content: m.content })),
+    ...session.messages.filter((m) => !m.isError).map((m) => ({ role: m.role, content: m.content })),
   ];
 
   const assistantMsg = { role: 'assistant', content: '', reasoning: '', isFinalAttempt: !!isFinalStep };
-  currentSession.messages.push(assistantMsg);
-  const idx = currentSession.messages.length - 1;
+  session.messages.push(assistantMsg);
+  const idx = session.messages.length - 1;
   renderChatView();
-  const bubbleEl = () => document.querySelector(`#msg-${idx} .msg-bubble`);
+  const isViewing = () => currentSession === session;
+  const bubbleEl = () => (isViewing() ? document.querySelector(`#msg-${idx} .msg-bubble`) : null);
+
+  const finish = () => {
+    activeSession = null;
+    setBusy(false);
+    persistSession(session);
+    if (isViewing()) renderChatView();
+  };
 
   callOpenRouterStream(apiMessages, {
     onReasoningToken: (chunk) => {
@@ -400,19 +482,15 @@ function runLessonCompletion(isFinalStep) {
     onDone: (fullText) => {
       assistantMsg.content = fullText;
       if (isFinalStep) {
-        currentSession.finalGenerated = true;
+        session.finalGenerated = true;
         assistantMsg.showPdfButton = true;
       }
-      setBusy(false);
-      renderChatView();
-      persistCurrentSession();
+      finish();
     },
     onError: (err) => {
       assistantMsg.content = '⚠️ เกิดข้อผิดพลาด: ' + err.message;
       assistantMsg.isError = true;
-      setBusy(false);
-      renderChatView();
-      persistCurrentSession();
+      finish();
     },
   });
 }
@@ -446,57 +524,74 @@ function startExerciseGeneration(topicText, attachment) {
   currentSession.attachment = attachment || null;
   currentSession.exerciseSets = { 1: { status: 'pending', content: '' }, 2: { status: 'pending', content: '' }, 3: { status: 'pending', content: '' }, 4: { status: 'pending', content: '' } };
   renderChatView();
-  persistCurrentSession();
+  persistSession(currentSession);
 
   runExerciseQueue([1, 2, 3, 4]);
 }
 
 async function runExerciseQueue(levels) {
+  const session = currentSession;
+  activeSession = session;
   setBusy(true);
-  for (const level of levels) {
-    await generateExerciseLevel(level);
+  try {
+    for (const level of levels) {
+      await generateExerciseLevel(session, level);
+    }
+  } finally {
+    activeSession = null;
+    setBusy(false);
   }
-  setBusy(false);
 }
 
-function generateExerciseLevel(level) {
+function generateExerciseLevel(session, level) {
   return new Promise((resolve) => {
-    const set = currentSession.exerciseSets[level];
+    const set = session.exerciseSets[level];
     set.status = 'streaming';
     set.content = '';
     set.reasoning = '';
-    renderExerciseCard(level);
 
-    const attachmentBlock = currentSession.attachment
-      ? buildAttachmentBlock(currentSession.attachment.name, currentSession.attachment.text)
+    // อัปเดตการ์ดเฉพาะตอนที่ผู้ใช้กำลังดู session นี้อยู่
+    const refreshCard = (full) => {
+      if (currentSession !== session) return;
+      if (full) renderExerciseCard(level);
+      else updateExerciseCardBody(level);
+    };
+    const finish = () => {
+      try {
+        persistSession(session);
+        refreshCard(true);
+      } finally {
+        resolve();
+      }
+    };
+    refreshCard(true);
+
+    const attachmentBlock = session.attachment
+      ? buildAttachmentBlock(session.attachment.name, session.attachment.text)
       : '';
     const apiMessages = [
       { role: 'system', content: buildExerciseSystemPrompt(level) },
-      { role: 'user', content: currentSession.topicText + attachmentBlock },
+      { role: 'user', content: session.topicText + attachmentBlock },
     ];
 
     callOpenRouterStream(apiMessages, {
       onReasoningToken: (chunk) => {
         set.reasoning += chunk;
-        updateExerciseCardBody(level);
+        refreshCard(false);
       },
       onToken: (_delta, fullText) => {
         set.content = fullText;
-        updateExerciseCardBody(level);
+        refreshCard(false);
       },
       onDone: (fullText) => {
         set.content = fullText;
         set.status = 'done';
-        renderExerciseCard(level);
-        persistCurrentSession();
-        resolve();
+        finish();
       },
       onError: (err) => {
         set.status = 'error';
         set.content = '⚠️ เกิดข้อผิดพลาด: ' + err.message;
-        renderExerciseCard(level);
-        persistCurrentSession();
-        resolve();
+        finish();
       },
     });
   });
@@ -504,8 +599,7 @@ function generateExerciseLevel(level) {
 
 function regenerateExerciseLevel(level) {
   if (isBusy) return;
-  setBusy(true);
-  generateExerciseLevel(level).then(() => setBusy(false));
+  runExerciseQueue([level]);
 }
 
 function renderExerciseCard(level) {

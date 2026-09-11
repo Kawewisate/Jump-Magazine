@@ -31,6 +31,17 @@ function buildAttachmentBlock(attachmentName, attachmentText) {
   return `\n\n[เอกสารอ้างอิงที่ครูอัปโหลด: ${attachmentName}]\n${attachmentText}\n[จบเอกสารอ้างอิง]`;
 }
 
+// เรียก callback ของ UI แยกจาก try ของ network — ถ้าฝั่ง UI พัง จะได้ไม่ถูกนับเป็น error ของ API
+// แล้วไปเขียนทับเนื้อหาที่เจนเสร็จแล้วด้วยข้อความ error
+function safeCallback(fn, ...args) {
+  if (!fn) return;
+  try {
+    fn(...args);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 /**
  * เรียก OpenRouter แบบ streaming (SSE)
  * callbacks: onReasoningToken(text), onToken(delta, fullText), onDone(fullText), onError(err)
@@ -40,10 +51,11 @@ async function callOpenRouterStream(messages, callbacks) {
   const settings = getSettings();
 
   if (!settings.apiKey) {
-    onError(new Error('กรุณาตั้งค่า OpenRouter API key ในหน้า Settings ก่อนใช้งาน'));
+    safeCallback(onError, new Error('กรุณาตั้งค่า OpenRouter API key ในหน้า Settings ก่อนใช้งาน'));
     return;
   }
 
+  let fullText = '';
   try {
     const resp = await fetch(OPENROUTER_URL, {
       method: 'POST',
@@ -66,10 +78,35 @@ async function callOpenRouterStream(messages, callbacks) {
       throw new Error(`เรียก API ไม่สำเร็จ (${resp.status}): ${errText.slice(0, 300)}`);
     }
 
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return;
+      const data = trimmed.slice(5).trim();
+      if (data === '[DONE]') return;
+      let json;
+      try {
+        json = JSON.parse(data);
+      } catch {
+        return;
+      }
+      // OpenRouter ส่ง error กลางสตรีมมาเป็น chunk ที่มี field "error" (HTTP status ยังเป็น 200)
+      if (json.error) {
+        throw new Error(`โมเดลตอบกลับด้วยข้อผิดพลาด: ${json.error.message || JSON.stringify(json.error)}`);
+      }
+      const delta = json.choices && json.choices[0] && json.choices[0].delta;
+      if (!delta) return;
+      if (delta.reasoning) {
+        safeCallback(onReasoningToken, delta.reasoning);
+      }
+      if (delta.content) {
+        fullText += delta.content;
+        safeCallback(onToken, delta.content, fullText);
+      }
+    };
+
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let fullText = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -77,32 +114,18 @@ async function callOpenRouterStream(messages, callbacks) {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
-        if (data === '[DONE]') continue;
-        let json;
-        try {
-          json = JSON.parse(data);
-        } catch {
-          continue;
-        }
-        const delta = json.choices && json.choices[0] && json.choices[0].delta;
-        if (!delta) continue;
-        if (delta.reasoning && onReasoningToken) {
-          onReasoningToken(delta.reasoning);
-        }
-        if (delta.content) {
-          fullText += delta.content;
-          onToken(delta.content, fullText);
-        }
-      }
+      lines.forEach(handleLine);
     }
+    buffer += decoder.decode();
+    if (buffer) handleLine(buffer);
 
-    onDone(fullText);
+    if (!fullText) {
+      throw new Error('โมเดลไม่ส่งคำตอบกลับมา ลองใหม่อีกครั้ง หรือเปลี่ยนโมเดลในหน้าตั้งค่า');
+    }
   } catch (err) {
-    onError(err);
+    safeCallback(onError, err);
+    return;
   }
+
+  safeCallback(onDone, fullText);
 }

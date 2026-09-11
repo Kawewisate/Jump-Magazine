@@ -1,14 +1,44 @@
 // แปลงเนื้อหา markdown ที่ AI เจนมาเป็น HTML พรีวิวจัดหน้าสวย แล้วเปิดให้ครูสั่งพิมพ์/บันทึกเป็น PDF เอง
 
+const MATH_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '\\(', right: '\\)', display: false },
+  { left: '$', right: '$', display: false },
+];
+
+// กลุ่ม 1 = code block / inline code (ปล่อยไว้ตามเดิม), กลุ่ม 2 = สูตร ($$..$$, \[..\], \(..\), $..$)
+const CODE_OR_MATH_PATTERN =
+  /(```[\s\S]*?```|`[^`\n]+`)|(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?:\\.|[^$\\\n])+\$)/g;
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ต้องดึงสูตรออกก่อนส่งให้ marked ไม่งั้น marked จะกิน backslash escape (\\ → \, \{ → {)
+// และตีความ * _ ในสูตรเป็นตัวเอียง ทำให้ KaTeX เรนเดอร์สูตรพัง แล้วค่อยใส่สูตรเดิมกลับหลัง sanitize
+function markdownToSafeHtml(markdownText) {
+  const mathSegments = [];
+  const protectedText = markdownText.replace(CODE_OR_MATH_PATTERN, (match, code, math) => {
+    if (code) return code;
+    mathSegments.push(math);
+    return `%%MATH${mathSegments.length - 1}%%`;
+  });
+  const html = DOMPurify.sanitize(marked.parse(protectedText));
+  return html.replace(/%%MATH(\d+)%%/g, (_, i) => escapeHtml(mathSegments[Number(i)]));
+}
+
 function renderMarkdownWithMath(container, markdownText) {
-  const rawHtml = marked.parse(markdownText || '');
-  container.innerHTML = window.DOMPurify ? DOMPurify.sanitize(rawHtml) : rawHtml;
+  const text = markdownText || '';
+  if (window.marked && window.DOMPurify) {
+    container.innerHTML = markdownToSafeHtml(text);
+  } else {
+    // CDN โหลดไม่ขึ้น: แสดงเป็นข้อความล้วน ห้ามยัด HTML จากโมเดลลงหน้าเว็บโดยไม่ผ่าน sanitize
+    container.innerHTML = `<div style="white-space: pre-wrap">${escapeHtml(text)}</div>`;
+  }
   if (window.renderMathInElement) {
     renderMathInElement(container, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$', right: '$', display: false },
-      ],
+      delimiters: MATH_DELIMITERS,
       throwOnError: false,
       strict: false,
     });
@@ -46,7 +76,8 @@ function exportPdf() {
 
   const opt = {
     filename,
-    margin: 0,
+    // ขอบกระดาษต้องตั้งที่ html2pdf (ใช้กับทุกหน้า) — padding ของ element มีผลแค่ต้นหน้าแรกกับท้ายหน้าสุดท้าย
+    margin: [15, 15, 15, 15],
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },

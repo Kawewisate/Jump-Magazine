@@ -34,8 +34,21 @@ function getSessions() {
   }
 }
 
+let storageFullWarned = false;
+
 function saveSessions(sessions) {
-  localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+  try {
+    // ไม่เก็บ reasoning (ความคิดของโมเดล) ลง storage — ยาวมากและกินพื้นที่ localStorage (~5MB) เร็ว
+    const json = JSON.stringify(sessions, (key, value) => (key === 'reasoning' ? undefined : value));
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, json);
+    storageFullWarned = false;
+  } catch (err) {
+    console.error(err);
+    if (!storageFullWarned) {
+      storageFullWarned = true;
+      alert('บันทึกประวัติงานไม่สำเร็จ — พื้นที่เก็บข้อมูลของเบราว์เซอร์อาจเต็ม ลองลบงานเก่าที่ไม่ใช้แล้วในแถบประวัติงาน');
+    }
+  }
 }
 
 function upsertSession(session) {

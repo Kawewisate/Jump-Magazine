@@ -116,8 +116,14 @@ button {
   visibility: hidden;
 }
 
-.session-item:hover .session-delete { visibility: visible; }
+.session-item:hover .session-delete,
+.session-item.active .session-delete { visibility: visible; }
 .session-delete:hover { color: var(--danger); }
+
+/* จอสัมผัส (มือถือ/iPad) ไม่มี hover — ต้องโชว์ปุ่มลบไว้ตลอด ไม่งั้นกดไม่ได้เลย */
+@media (hover: none) {
+  .session-delete { visibility: visible; }
+}
 
 .settings-btn {
   margin-top: 12px;
@@ -541,8 +547,16 @@ button {
 #print-body { font-size: 14px; line-height: 1.7; }
 #print-body h1, #print-body h2, #print-body h3 { margin: 1em 0 0.4em; }
 
-/* ตอนกำลัง capture เป็น PDF: เอา box-shadow ออก + ให้สูตรยาวโชว์เต็มไม่ถูกตัดโดย scrollbar หน้าจอ */
-#print-page.exporting-pdf { box-shadow: none; }
+/* ตอนกำลัง capture เป็น PDF: เอา box-shadow ออก + ให้สูตรยาวโชว์เต็มไม่ถูกตัดโดย scrollbar หน้าจอ
+   เอา padding/ความสูงคงที่ของ element ออกด้วย เพราะขอบกระดาษถูกกำหนดผ่าน html2pdf margin แทนแล้ว
+   (ถ้าเหลือ padding ค้างไว้ ระยะขอบจะซ้อนกันเฉพาะหน้าแรก ส่วนหน้าอื่นเนื้อหาจะชิดขอบกระดาษ) */
+#print-page.exporting-pdf {
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+  width: auto;
+  max-width: none;
+}
 #print-page.exporting-pdf .katex-display { overflow: visible; }
 
 .hidden { display: none !important; }
