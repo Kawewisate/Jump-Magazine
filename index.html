@@ -91,7 +91,21 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/marked.min.js"></script>
+<div id="slide-overlay" class="slide-overlay hidden">
+  <div class="slide-toolbar no-print">
+    <button id="slide-close">✕ ปิด</button>
+    <span id="slide-counter" class="slide-counter"></span>
+    <button id="slide-prev">◀</button>
+    <button id="slide-next">▶</button>
+    <button id="slide-fullscreen">⛶ เต็มจอ</button>
+    <button id="slide-pdf">📥 บันทึกสไลด์เป็น PDF</button>
+  </div>
+  <div id="slide-viewport">
+    <div id="slide-stage"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/lib/marked.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -102,7 +116,12 @@
 <script src="storage.js"></script>
 <script src="api.js"></script>
 <script src="fileparse.js"></script>
+<script src="diagrams-core.js"></script>
+<script src="diagrams-science.js"></script>
+<script src="diagrams-math.js"></script>
+<script src="diagrams-concept.js"></script>
 <script src="print.js"></script>
+<script src="slides.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -28,7 +28,8 @@ function markdownToSafeHtml(markdownText) {
   return html.replace(/%%MATH(\d+)%%/g, (_, i) => escapeHtml(mathSegments[Number(i)]));
 }
 
-function renderMarkdownWithMath(container, markdownText) {
+// renderDiagrams=false ใช้ตอน stream ข้อความสดๆ (ยังไม่อยากวาดรูปซ้ำๆ ระหว่างพิมพ์)
+function renderMarkdownWithMath(container, markdownText, { renderDiagrams = true } = {}) {
   const text = markdownText || '';
   if (window.marked && window.DOMPurify) {
     container.innerHTML = markdownToSafeHtml(text);
@@ -36,6 +37,7 @@ function renderMarkdownWithMath(container, markdownText) {
     // CDN โหลดไม่ขึ้น: แสดงเป็นข้อความล้วน ห้ามยัด HTML จากโมเดลลงหน้าเว็บโดยไม่ผ่าน sanitize
     container.innerHTML = `<div style="white-space: pre-wrap">${escapeHtml(text)}</div>`;
   }
+  // KaTeX ก่อน (auto-render ข้าม pre/code โดยธรรมชาติ จึงไม่ยุ่งกับ JSON ของ diagram)
   if (window.renderMathInElement) {
     renderMathInElement(container, {
       delimiters: MATH_DELIMITERS,
@@ -43,6 +45,12 @@ function renderMarkdownWithMath(container, markdownText) {
       strict: false,
     });
   }
+  // แล้วค่อยแปลงบล็อก ```diagram/```mermaid เป็นรูปจริง
+  if (renderDiagrams && window.renderDiagramsIn) {
+    return renderDiagramsIn(container);
+  }
+  container.diagramsReady = Promise.resolve();
+  return container.diagramsReady;
 }
 
 function openPrintPreview(title, markdownText) {
@@ -63,7 +71,7 @@ function sanitizeFilename(name) {
 // เลือกวิธีนี้แทนการพึ่ง window.print()/Ctrl+P เพราะเบราว์เซอร์ (โดยเฉพาะ Chrome)
 // มีบั๊กเรื่องการแบ่งหน้าพิมพ์กับ element ที่ตั้ง overflow ไว้ ทำให้ได้ PDF หน้าเปล่า/ไม่ครบ
 // วิธีนี้ควบคุมการแบ่งหน้าเองทั้งหมด ไม่พึ่ง print engine ของเบราว์เซอร์
-function exportPdf() {
+async function exportPdf() {
   const pageEl = document.getElementById('print-page');
   const btn = document.getElementById('print-btn');
   const titleText = document.getElementById('print-title').textContent;
@@ -72,6 +80,17 @@ function exportPdf() {
   const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
+
+  // รอให้รูปประกอบ (diagram/mermaid) วาดเสร็จก่อน ไม่งั้น html2canvas อาจ capture ตอนยังเป็นกล่องว่าง
+  const printBody = document.getElementById('print-body');
+  if (printBody.diagramsReady) {
+    try {
+      await printBody.diagramsReady;
+    } catch {
+      // เพิกเฉย — รูปที่พังจะกลายเป็นกล่อง fallback อยู่แล้วจาก renderDiagramsIn
+    }
+  }
+
   pageEl.classList.add('exporting-pdf');
 
   const opt = {

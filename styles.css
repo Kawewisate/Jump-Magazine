@@ -289,6 +289,59 @@ button {
 
 .pdf-btn { margin-top: 12px; display: inline-block; }
 
+.msg-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.msg-actions .pdf-btn { margin-top: 0; }
+
+/* ---------- Diagrams (รูปประกอบ) ---------- */
+
+figure.diagram {
+  margin: 14px 0;
+  padding: 10px;
+  background: #FCFAF6;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+figure.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+figure.diagram figcaption {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+figure.diagram-fallback {
+  text-align: left;
+  background: #FBEDE8;
+  border-color: #E3BEB0;
+}
+
+.diagram-fallback-msg { color: var(--danger); font-size: 13px; margin-bottom: 6px; }
+.diagram-fallback details summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
+.diagram-fallback details pre { white-space: pre-wrap; font-size: 11px; overflow-x: auto; max-height: 160px; overflow-y: auto; }
+
+.diagram-edit-btn {
+  display: block;
+  margin: 8px auto 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.diagram-edit-btn:hover { background: var(--user-bubble-bg); color: var(--text); }
+.diagram-edit-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ไม่ต้องมีปุ่มแก้รูปในพรีวิว/PDF/สไลด์ */
+#print-body .diagram-edit-btn { display: none; }
+
 /* ---------- Chat input area ---------- */
 
 #chat-input-area {
@@ -546,6 +599,8 @@ button {
 
 #print-body { font-size: 14px; line-height: 1.7; }
 #print-body h1, #print-body h2, #print-body h3 { margin: 1em 0 0.4em; }
+#print-body figure.diagram { max-height: 110mm; }
+#print-body figure.diagram svg { max-height: 100mm; width: auto; margin: 0 auto; display: block; }
 
 /* ตอนกำลัง capture เป็น PDF: เอา box-shadow ออก + ให้สูตรยาวโชว์เต็มไม่ถูกตัดโดย scrollbar หน้าจอ
    เอา padding/ความสูงคงที่ของ element ออกด้วย เพราะขอบกระดาษถูกกำหนดผ่าน html2pdf margin แทนแล้ว
@@ -652,6 +707,118 @@ button {
   #sidebar.open { transform: translateX(0); }
 
   #sidebar-backdrop { display: block; }
+}
+
+/* ---------- Slide view (สไลด์นำเสนอ) ---------- */
+
+.slide-overlay {
+  position: fixed;
+  inset: 0;
+  background: #1C1A16;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+.slide-toolbar button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 13.5px;
+  background: #3A362E;
+  color: #fff;
+}
+.slide-toolbar button:hover { background: #4A453B; }
+.slide-toolbar button:disabled { opacity: 0.4; cursor: default; }
+#slide-close { background: #fff; color: var(--text); }
+#slide-pdf { background: var(--accent); }
+.slide-counter { color: #E5E0D8; font-size: 13.5px; min-width: 60px; text-align: center; }
+
+#slide-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#slide-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1280px;
+  height: 720px;
+  transform-origin: center center;
+}
+
+.slide-loading {
+  color: #E5E0D8;
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 16px;
+}
+
+.slide-page {
+  position: absolute;
+  inset: 0;
+  width: 1280px;
+  height: 720px;
+  background: #fff;
+  box-sizing: border-box;
+  padding: 60px 80px;
+  display: none;
+  overflow: hidden;
+  font-size: 22px;
+  line-height: 1.5;
+}
+.slide-page.active { display: block; }
+
+.slide-accent-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: var(--accent);
+}
+
+.slide-title-text {
+  font-size: 52px;
+  margin: 220px 0 16px;
+  text-align: center;
+  color: var(--text);
+}
+.slide-subtitle { text-align: center; color: var(--text-muted); font-size: 20px; }
+
+.slide-heading {
+  font-size: 36px;
+  color: var(--accent);
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 12px;
+  margin: 0 0 24px;
+}
+
+.slide-body { font-size: 22px; }
+.slide-body h1, .slide-body h2, .slide-body h3 { font-size: 26px; margin: 0.6em 0 0.3em; }
+.slide-body p { margin: 0.5em 0; }
+.slide-body figure.diagram { max-height: 260px; }
+.slide-body figure.diagram svg { max-height: 240px; width: auto; }
+.slide-body .diagram-edit-btn { display: none; }
+
+.slide-pdf-page { position: static !important; transform: none !important; display: block !important; margin: 0; }
+
+@media (max-width: 900px) {
+  .slide-toolbar { gap: 6px; padding: 8px; }
+  .slide-toolbar button { padding: 7px 10px; font-size: 12px; }
 }
 
 /* Phone-sized screens: tighter spacing, avoid iOS auto-zoom on focus, single-column exercise cards */
