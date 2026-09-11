@@ -235,6 +235,102 @@ function renderAttachChip() {
   el.attachChip.appendChild(removeBtn);
 }
 
+// ---------- Diagram streaming placeholder / auto-repair / manual edit ----------
+
+// ระหว่าง stream ยังไม่อยากโชว์ JSON ดิบของรูปประกอบ ให้แทนด้วยข้อความสถานะไปก่อน
+// (บล็อกที่ปิดสมบูรณ์แล้ว และบล็อกที่กำลังพิมพ์ค้างอยู่ท้ายข้อความ ก็ครอบคลุมทั้งคู่)
+function displayStreamingText(fullText) {
+  let out = fullText.replace(/```(diagram|mermaid)\n[\s\S]*?```/g, '[🖼️ กำลังวาดรูปประกอบ...]');
+  const openFence = out.match(/```(diagram|mermaid)\n[\s\S]*$/);
+  if (openFence) {
+    out = out.slice(0, openFence.index) + '[🖼️ กำลังวาดรูปประกอบ...]';
+  }
+  return out;
+}
+
+const MAX_DIAGRAM_REPAIRS = 4;
+
+// ตรวจบล็อก diagram ทั้งหมดใน content แล้วขอให้โมเดลซ่อมบล็อกที่พังทีละบล็อก (จำกัดจำนวนครั้ง)
+// คืนค่า { content, repaired } — repaired=true ถ้ามีการแก้อย่างน้อย 1 บล็อก
+async function autoRepairDiagrams(content, onStatus) {
+  if (!window.validateDiagramBlocks || !/```diagram/.test(content)) return { content, repaired: false };
+  let text = content;
+  let repairedAny = false;
+  let attempts = 0;
+  for (let round = 0; round < 2; round++) {
+    const results = await validateDiagramBlocks(text);
+    const broken = results.filter((r) => !r.ok);
+    if (!broken.length) break;
+    for (const b of broken) {
+      if (attempts >= MAX_DIAGRAM_REPAIRS) break;
+      attempts++;
+      safeCallback(onStatus, `🔧 กำลังซ่อมรูปประกอบ (${attempts}/${MAX_DIAGRAM_REPAIRS})...`);
+      try {
+        let guessedType = 'ไม่ทราบชนิด';
+        const typeMatch = b.source.match(/"type"\s*:\s*"([^"]+)"/);
+        if (typeMatch) guessedType = typeMatch[1];
+        const reply = await callOpenRouterText([
+          { role: 'system', content: buildDiagramRepairSystemPrompt() },
+          { role: 'user', content: buildDiagramRepairUserPrompt(guessedType, b.source, b.error) },
+        ]);
+        const fixedSource = stripCodeFence(reply);
+        JSON.parse(fixedSource.replace(/[“”]/g, '"').replace(/[‘’]/g, "'")); // ตรวจว่าเป็น JSON ถูกต้องก่อนแทนที่
+        text = replaceDiagramBlock(text, b.index, fixedSource, b.lang);
+        repairedAny = true;
+      } catch (err) {
+        console.error('diagram repair failed', err);
+      }
+    }
+    if (attempts >= MAX_DIAGRAM_REPAIRS) break;
+  }
+  return { content: text, repaired: repairedAny };
+}
+
+// เรียกจาก event listener ของปุ่ม "✏️ แก้รูปนี้" — คืน source ใหม่ (string) หรือ null ถ้ายกเลิก/พัง
+async function requestDiagramEdit(source) {
+  const instruction = prompt('ต้องการแก้ไขรูปนี้อย่างไร? (เช่น "เปลี่ยนแรงเป็น 50 N", "เพิ่มป้ายกำกับมุม")');
+  if (!instruction || !instruction.trim()) return null;
+  const reply = await callOpenRouterText([
+    { role: 'system', content: buildDiagramEditSystemPrompt() },
+    { role: 'user', content: buildDiagramEditUserPrompt(source, instruction.trim()) },
+  ]);
+  const fixedSource = stripCodeFence(reply);
+  JSON.parse(fixedSource.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"));
+  return fixedSource;
+}
+
+// เติมปุ่ม "✏️ แก้รูปนี้" ใต้รูปทุกรูปใน container (ไม่ใช้ใน PDF/สไลด์) — getContent/setContent อ่าน-เขียน markdown ต้นทาง
+function attachDiagramEditButtons(container, getContent, setContent) {
+  const figures = container.querySelectorAll('figure.diagram:not(.diagram-fallback)');
+  figures.forEach((fig, idx) => {
+    if (fig.querySelector('.diagram-edit-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'diagram-edit-btn';
+    btn.type = 'button';
+    btn.textContent = '✏️ แก้รูปนี้';
+    btn.addEventListener('click', async () => {
+      if (isBusy) return;
+      const blocks = extractDiagramBlocks(getContent());
+      const target = blocks[idx];
+      if (!target) return;
+      btn.disabled = true;
+      btn.textContent = '⏳ กำลังแก้ไข...';
+      try {
+        const newSource = await requestDiagramEdit(target.source);
+        if (newSource) {
+          setContent(replaceDiagramBlock(getContent(), idx, newSource, target.lang));
+        }
+      } catch (err) {
+        alert('แก้รูปไม่สำเร็จ: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✏️ แก้รูปนี้';
+      }
+    });
+    fig.appendChild(btn);
+  });
+}
+
 // ---------- Chat rendering ----------
 
 function renderChatView() {
@@ -326,21 +422,42 @@ function buildMessageBubble(msg, idx) {
     if (generatingHere && isLastMsg) {
       // กลับมาดูงานที่ยังเจนไม่เสร็จ: แสดงแบบ streaming ต่อ ยังไม่ต้องโชว์ปุ่มยืนยัน/PDF
       content.classList.add('streaming');
-      content.textContent = msg.content;
+      content.textContent = displayStreamingText(msg.content);
       bubble.appendChild(content);
     } else {
+      const session = currentSession;
       renderMarkdownWithMath(content, msg.content);
       bubble.appendChild(content);
+      Promise.resolve(content.diagramsReady).then(() => {
+        if (currentSession !== session) return;
+        attachDiagramEditButtons(
+          content,
+          () => session.messages[idx].content,
+          (newContent) => {
+            session.messages[idx].content = newContent;
+            persistSession(session);
+            if (currentSession === session) renderChatView();
+          }
+        );
+      });
 
       if (currentSession.mode === 'lesson' && isLastMsg && !currentSession.finalGenerated && msg.content) {
         bubble.appendChild(buildConfirmControls());
       }
       if (msg.showPdfButton) {
+        const actions = document.createElement('div');
+        actions.className = 'msg-actions';
         const btn = document.createElement('button');
         btn.className = 'pdf-btn';
         btn.textContent = '📄 ดูตัวอย่าง PDF';
         btn.addEventListener('click', () => openPrintPreview(currentSession.title || 'เนื้อหาการสอน', msg.content));
-        bubble.appendChild(btn);
+        actions.appendChild(btn);
+        const slideBtn = document.createElement('button');
+        slideBtn.className = 'pdf-btn slide-view-btn';
+        slideBtn.textContent = '🖥️ ดูเป็นสไลด์';
+        slideBtn.addEventListener('click', () => openSlideView(currentSession.title || 'เนื้อหาการสอน', msg.content));
+        actions.appendChild(slideBtn);
+        bubble.appendChild(actions);
       }
     }
   }
@@ -476,12 +593,27 @@ function runLessonCompletion(isFinalStep) {
           c.className = 'markdown-body streaming';
           b.appendChild(c);
         }
-        c.textContent = fullText;
+        c.textContent = displayStreamingText(fullText);
       }
     },
-    onDone: (fullText) => {
+    onDone: async (fullText) => {
       assistantMsg.content = fullText;
       if (isFinalStep) {
+        const b = bubbleEl();
+        if (b) {
+          const c = b.querySelector('.markdown-body');
+          if (c) c.textContent = '🔧 กำลังตรวจรูปประกอบ...';
+        }
+        try {
+          const { content: repaired } = await autoRepairDiagrams(fullText, (status) => {
+            const bb = bubbleEl();
+            const cc = bb && bb.querySelector('.markdown-body');
+            if (cc) cc.textContent = status;
+          });
+          assistantMsg.content = repaired;
+        } catch (err) {
+          console.error(err);
+        }
         session.finalGenerated = true;
         assistantMsg.showPdfButton = true;
       }
@@ -583,8 +715,19 @@ function generateExerciseLevel(session, level) {
         set.content = fullText;
         refreshCard(false);
       },
-      onDone: (fullText) => {
+      onDone: async (fullText) => {
         set.content = fullText;
+        set.status = 'repairing';
+        refreshCard(false);
+        try {
+          const { content: repaired } = await autoRepairDiagrams(fullText, (status) => {
+            set.repairStatus = status;
+            refreshCard(false);
+          });
+          set.content = repaired;
+        } catch (err) {
+          console.error(err);
+        }
         set.status = 'done';
         finish();
       },
@@ -623,21 +766,36 @@ function renderExerciseCard(level) {
 }
 
 function updateExerciseCardBody(level) {
-  const set = currentSession.exerciseSets[level];
+  const session = currentSession;
+  const set = session.exerciseSets[level];
   const body = document.getElementById(`exercise-body-${level}`);
   if (!body) return;
   if (set.status === 'pending') {
     body.textContent = 'รอคิว...';
   } else if (set.status === 'streaming') {
     if (set.content) {
-      body.textContent = set.content;
+      body.textContent = displayStreamingText(set.content);
     } else if (set.reasoning) {
       body.textContent = '🧠 กำลังคิด: ' + set.reasoning;
     } else {
       body.textContent = 'กำลังสร้าง...';
     }
+  } else if (set.status === 'repairing') {
+    body.textContent = set.repairStatus || '🔧 กำลังตรวจรูปประกอบ...';
   } else {
     renderMarkdownWithMath(body, set.content);
+    Promise.resolve(body.diagramsReady).then(() => {
+      if (currentSession !== session) return;
+      attachDiagramEditButtons(
+        body,
+        () => session.exerciseSets[level].content,
+        (newContent) => {
+          session.exerciseSets[level].content = newContent;
+          persistSession(session);
+          if (currentSession === session) updateExerciseCardBody(level);
+        }
+      );
+    });
   }
 }
 

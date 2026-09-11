@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diagram Gallery (dev)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { background: #EFEAE0; font-family: 'Sarabun', sans-serif; padding: 20px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
+  .card { background: #fff; border: 1px solid #E5E0D8; border-radius: 10px; padding: 14px; }
+  .card h3 { margin: 0 0 4px; font-size: 14px; }
+  .card .status { font-size: 12px; margin-bottom: 8px; }
+  .status.ok { color: #2e7d32; }
+  .status.fail { color: #B3432B; }
+  .card pre.src { background: #F5F1EA; padding: 6px; font-size: 10.5px; max-height: 90px; overflow: auto; margin: 0 0 8px; }
+  .eval-summary { background: #fff; border: 1px solid #E5E0D8; border-radius: 10px; padding: 14px; margin-bottom: 20px; white-space: pre-wrap; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Diagram Gallery (dev only — not linked from the app)</h1>
+<div id="eval-section"></div>
+<div id="gallery" class="gallery"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="storage.js"></script>
+<script src="api.js"></script>
+<script src="diagrams-core.js"></script>
+<script src="diagrams-science.js"></script>
+<script src="diagrams-math.js"></script>
+<script src="diagrams-concept.js"></script>
+<script>
+// ตัวอย่างสเปคของทุก type — รวมเคสยากๆ (alias, ค่า default, JSON เพี้ยนเล็กน้อย)
+const SAMPLES = [
+  ['blocks (ตัวอย่างของผู้ใช้)', `{"type":"blocks","wall":true,"blocks":[
+    {"id":"A","label":"10.0 kg","on":"B","width":70,"height":50},
+    {"id":"B","label":"20.0 kg","width":110,"height":60}
+  ],"ropes":[{"from":"wall","to":"A","label":""}],
+  "forces":[{"on":"B","dir":"right","label":"100 N","value":100}],
+  "surface":"rough"}`],
+  ['blocks (alias: block-system, trailing comma)', `{"type":"block-system","blocks":[{"id":"A","label":"5 kg","width":80,},{"id":"B","label":"3 kg","width":60},],"forces":[{"on":"A","dir":"right","label":"20 N"}]}`],
+  ['incline', `{"type":"incline","angle":30,"label":"m = 5 kg","forces":["weight","normal","friction"]}`],
+  ['incline + pulley', `{"type":"incline","angle":25,"label":"m1","forces":["weight","normal","applied"],"pulley":true,"hangingLabel":"m2"}`],
+  ['pulley atwood', `{"type":"pulley","style":"atwood","left":"m1 = 2 kg","right":"m2 = 3 kg"}`],
+  ['pulley table', `{"type":"pulley","style":"table","table":"m1 = 4 kg","hanging":"m2 = 2 kg"}`],
+  ['fbd (alias free-body)', `{"type":"free-body","forces":[{"angle":90,"label":"N"},{"angle":270,"label":"mg"},{"angle":0,"label":"F=20N"},{"angle":200,"label":"f"}],"axes":true}`],
+  ['circuit series+parallel', `{"type":"circuit","battery":"12V","path":[{"kind":"resistor","label":"R1=2Ω"},{"kind":"parallel","branches":[[{"kind":"bulb","label":"L1"}],[{"kind":"resistor","label":"R2=4Ω"},{"kind":"switch"}]]},{"kind":"ammeter"}]}`],
+  ['optics convex-lens', `{"type":"optics","device":"convex-lens","f":40,"objectDist":70,"objectHeight":30}`],
+  ['optics concave-mirror', `{"type":"optics","device":"concave-mirror","f":50,"objectDist":30,"objectHeight":25}`],
+  ['atom (Na)', `{"type":"atom","element":"Na","shells":[2,8,1]}`],
+  ['molecule (ethanol)', `{"type":"molecule","smiles":"CCO","label":"เอทานอล"}`],
+  ['molecule (benzene)', `{"type":"molecule","smiles":"c1ccccc1","label":"เบนซีน"}`],
+  ['graph function', `{"type":"graph","xRange":[-5,5],"yRange":[-5,10],"functions":[{"expr":"x^2-2","label":"y=x²-2"}],"points":[{"x":1,"y":-1,"label":"A"}]}`],
+  ['graph v-t polyline (alias plot)', `{"type":"plot","xRange":[0,10],"yRange":[0,8],"polylines":[{"points":[[0,0],[2,6],[6,6],[10,0]],"label":"v-t"}],"xLabel":"t (s)","yLabel":"v (m/s)"}`],
+  ['graph blank axes', `{"type":"graph","xRange":[-4,4],"yRange":[-4,4]}`],
+  ['geometry triangle right-angle', `{"type":"geometry","points":{"A":[0,0],"B":[4,0],"C":[0,3]},"segments":[["A","B"],["B","C"],["C","A"]],"sideLabels":[{"between":["A","B"],"label":"4 cm"},{"between":["A","C"],"label":"3 cm"},{"between":["B","C"],"label":"5 cm"}],"rightAngle":"A"}`],
+  ['geometry angle+equal marks', `{"type":"triangle","points":{"A":[0,0],"B":[5,0],"C":[2.5,4]},"segments":[["A","B"],["B","C"],["C","A"]],"equalMarks":[["A","C"],["B","C"]],"angles":[{"at":"A","between":["B","C"],"label":"θ"}]}`],
+  ['solid cuboid', `{"type":"solid","shape":"cuboid","dims":{"width":90,"depth":50,"height":70},"labels":{"width":"6 cm","depth":"4 cm","height":"5 cm"}}`],
+  ['solid cylinder', `{"type":"solid","shape":"cylinder","dims":{"radius":35,"height":90},"labels":{"radius":"r=3 cm","height":"h=8 cm"}}`],
+  ['solid cone', `{"type":"solid","shape":"cone","dims":{"radius":40,"height":90},"labels":{"radius":"r","height":"h"}}`],
+  ['solid sphere', `{"type":"solid","shape":"sphere","dims":{"radius":60},"labels":{"radius":"r=6 cm"}}`],
+  ['solid pyramid', `{"type":"solid","shape":"pyramid","dims":{"base":90,"height":90},"labels":{"height":"h"}}`],
+  ['numberline inequality', `{"type":"numberline","min":-5,"max":5,"intervals":[{"from":-1,"to":3,"fromOpen":true,"toOpen":false}],"points":[{"value":-1,"filled":false},{"value":3,"filled":true}]}`],
+  ['chart bar', `{"type":"chart","kind":"bar","data":[{"label":"จ.","value":5},{"label":"อ.","value":8},{"label":"พ.","value":3}],"xLabel":"วัน","yLabel":"จำนวน"}`],
+  ['chart pie', `{"type":"chart","kind":"pie","data":[{"label":"ชอบ","value":60},{"label":"เฉยๆ","value":25},{"label":"ไม่ชอบ","value":15}]}`],
+  ['chart line', `{"type":"chart","kind":"line","data":[{"label":"1","value":2},{"label":"2","value":5},{"label":"3","value":3}]}`],
+  ['chart scatter', `{"type":"chart","kind":"scatter","data":[{"x":1,"y":2},{"x":2,"y":3},{"x":3,"y":2.5}]}`],
+  ['venn 2 sets', `{"type":"venn","sets":[{"label":"A","items":"2,4,6,8"},{"label":"B","items":"3,6,9"}],"universe":"U = {1..10}"}`],
+  ['venn 3 sets', `{"type":"venn","sets":[{"label":"A","items":"1,2"},{"label":"B","items":"2,3"},{"label":"C","items":"3,1"}]}`],
+  ['tree probability', `{"type":"probability-tree","root":"เริ่ม","children":[{"label":"หัว","edgeLabel":"1/2","children":[{"label":"หัว","edgeLabel":"1/2"},{"label":"ก้อย","edgeLabel":"1/2"}]},{"label":"ก้อย","edgeLabel":"1/2"}]}`],
+  ['tree factor vertical', `{"type":"factor-tree","direction":"vertical","root":"24","children":[{"label":"4","children":[{"label":"2"},{"label":"2"}]},{"label":"6","children":[{"label":"2"},{"label":"3"}]}]}`],
+  ['fraction bar', `{"type":"fraction","style":"bar","total":8,"shaded":3,"label":"3/8"}`],
+  ['fraction circle', `{"type":"fraction","style":"circle","total":6,"shaded":4,"label":"4/6"}`],
+  ['fraction grid', `{"type":"fraction","style":"grid","total":9,"shaded":5,"label":"5/9"}`],
+  ['flow horizontal', `{"type":"flow","direction":"horizontal","steps":["เริ่มต้น","รับข้อมูล","ประมวลผล","แสดงผล","สิ้นสุด"]}`],
+  ['flow vertical', `{"type":"process","direction":"vertical","steps":["ใส่น้ำ","ต้ม","ชง","เสิร์ฟ"]}`],
+  ['cycle water', `{"type":"cycle","steps":["การระเหย","การควบแน่น","การตกตะกอน","การไหลบ่า"]}`],
+  ['timeline sukhothai', `{"type":"timeline","events":[{"date":"พ.ศ. 1800","label":"ก่อตั้งสุโขทัย"},{"date":"พ.ศ. 1822","label":"พ่อขุนรามคำแหง"},{"date":"พ.ศ. 1920","label":"สิ้นสุดยุคสุโขทัย"}]}`],
+  ['mindmap', `{"type":"mindmap","center":"เซลล์","branches":[{"label":"ผนังเซลล์","items":["พืชมี","สัตว์ไม่มี"]},{"label":"นิวเคลียส","items":["ควบคุมเซลล์"]},{"label":"ไมโทคอนเดรีย","items":["สร้างพลังงาน"]}]}`],
+  ['unknown type -> fallback', `{"type":"not-a-real-type","foo":"bar"}`],
+  ['broken json -> fallback', `{"type":"blocks","blocks":[{"id":"A" "label":"5kg"}]}`],
+];
+
+async function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  for (const [name, source] of SAMPLES) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const h3 = document.createElement('h3');
+    h3.textContent = name;
+    card.appendChild(h3);
+    const status = document.createElement('div');
+    status.className = 'status';
+    card.appendChild(status);
+    const pre = document.createElement('pre');
+    pre.className = 'src';
+    pre.textContent = source;
+    card.appendChild(pre);
+    gallery.appendChild(card);
+    try {
+      const spec = await parseDiagramSpec(source);
+      const fig = await buildDiagramFigure(spec);
+      card.appendChild(fig);
+      status.textContent = '✅ OK';
+      status.classList.add('ok');
+    } catch (err) {
+      status.textContent = '❌ ' + err.message;
+      status.classList.add('fail');
+      card.appendChild(makeFallbackFigure(source, err.message));
+    }
+  }
+
+  // mermaid ตัวอย่าง
+  const mmdCard = document.createElement('div');
+  mmdCard.className = 'card';
+  mmdCard.innerHTML = '<h3>mermaid flowchart</h3>';
+  gallery.appendChild(mmdCard);
+  const mmdWrap = document.createElement('div');
+  mmdCard.appendChild(mmdWrap);
+  try {
+    await renderMermaidInto(mmdWrap, 'flowchart TD\nA[เริ่ม] --> B{เงื่อนไข?}\nB -- ใช่ --> C[ทำ A]\nB -- ไม่ --> D[ทำ B]\nC --> E[จบ]\nD --> E');
+  } catch (err) {
+    mmdCard.appendChild(makeFallbackFigure('mermaid sample', err.message));
+  }
+}
+
+async function renderEvalSection() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('eval') !== '1') return;
+  const section = document.getElementById('eval-section');
+  section.innerHTML = '<p>กำลังโหลดผล eval จาก tools/eval-out/ ...</p>';
+  try {
+    const idxResp = await fetch('tools/eval-out/index.json');
+    if (!idxResp.ok) throw new Error('ไม่พบ tools/eval-out/index.json (รัน node tools/eval-diagrams.mjs ก่อน)');
+    const files = await idxResp.json();
+    let totalBlocks = 0, okBlocks = 0;
+    const details = [];
+    for (const f of files) {
+      const r = await fetch('tools/eval-out/' + f).then((x) => x.json());
+      for (const item of r.results || []) {
+        const blocks = extractDiagramBlocks(item.content || '');
+        for (const b of blocks) {
+          totalBlocks++;
+          try {
+            if (b.lang === 'diagram') {
+              const spec = await parseDiagramSpec(b.source);
+              await buildDiagramFigure(spec);
+            }
+            okBlocks++;
+          } catch (err) {
+            details.push(`❌ [${r.topic}/${item.step}] block#${b.index} (${b.lang}): ${err.message}`);
+          }
+        }
+      }
+    }
+    const pct = totalBlocks ? ((okBlocks / totalBlocks) * 100).toFixed(1) : 'N/A';
+    section.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'eval-summary';
+    box.textContent = `Eval summary: ${okBlocks}/${totalBlocks} blocks render OK (${pct}%)\n\n` + details.join('\n');
+    section.appendChild(box);
+  } catch (err) {
+    section.innerHTML = `<div class="eval-summary">โหลดผล eval ไม่สำเร็จ: ${err.message}</div>`;
+  }
+}
+
+renderGallery();
+renderEvalSection();
+</script>
+</body>
+</html>
