@@ -1,8 +1,8 @@
 // Renderers: flow, cycle, timeline, mindmap
 
-const CON_STROKE = '#2D2A26';
-const CON_ACCENT = '#D97757';
-const CON_BOX = '#F5F1EA';
+const CON_STROKE = DIAGRAM_COLORS.ink;
+const CON_ACCENT = DIAGRAM_COLORS.accent;
+const CON_BOX = DIAGRAM_COLORS.solid;
 
 function boxWithText(svg, cx, cy, w, h, text, attrs = {}) {
   svg.appendChild(svgEl('rect', { x: cx - w / 2, y: cy - h / 2, width: w, height: h, rx: 8, fill: CON_BOX, stroke: CON_STROKE, 'stroke-width': 1.8, ...attrs }));
@@ -89,7 +89,7 @@ registerDiagram({
       svg.appendChild(svgEl('circle', { cx: x, cy: y, r: 6, fill: CON_ACCENT, stroke: CON_STROKE, 'stroke-width': 1.5 }));
       const above = i % 2 === 0;
       const labelY = above ? y - 40 : y + 55;
-      svg.appendChild(svgEl('line', { x1: x, y1: y, x2: x, y2: above ? labelY + 14 : labelY - 14, stroke: '#C9C2B4', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('line', { x1: x, y1: y, x2: x, y2: above ? labelY + 14 : labelY - 14, stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1 }));
       svg.appendChild(textEl(x, above ? y - 16 : y + 30, e.date, { 'font-size': 12, 'font-weight': 'bold', fill: CON_ACCENT }));
       const lines = wrapTextLines(e.label, gap - 10, 12);
       svg.appendChild(multilineText(x, labelY, lines.join('\n'), { 'font-size': 12, lineHeight: 15 }));
@@ -116,16 +116,16 @@ registerDiagram({
       const ang = (2 * Math.PI * i) / n - Math.PI / 2;
       const bx = cx + r * Math.cos(ang), by = cy + r * Math.sin(ang);
       svg.appendChild(svgEl('line', { x1: cx, y1: cy, x2: bx, y2: by, stroke: CON_ACCENT, 'stroke-width': 2 }));
-      boxWithText(svg, bx, by, 120, 44, b.label, { fill: '#FFF3EC', stroke: CON_ACCENT });
+      boxWithText(svg, bx, by, 120, 44, b.label, { fill: DIAGRAM_COLORS.warmFill, stroke: CON_ACCENT });
       const dir = Math.cos(ang) >= 0 ? 1 : -1;
       (b.items || []).forEach((item, j) => {
         const ix = bx + dir * 90;
         const iy = by + (j - (b.items.length - 1) / 2) * 30;
-        svg.appendChild(svgEl('line', { x1: bx + dir * 60, y1: by, x2: ix - dir * 45, y2: iy, stroke: '#C9C2B4', 'stroke-width': 1 }));
+        svg.appendChild(svgEl('line', { x1: bx + dir * 60, y1: by, x2: ix - dir * 45, y2: iy, stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1 }));
         svg.appendChild(textEl(ix, iy + 4, item, { 'font-size': 11, 'text-anchor': dir >= 0 ? 'start' : 'end' }));
       });
     });
-    boxWithText(svg, cx, cy, 130, 55, spec.center || '', { fill: '#FFFFFF', 'stroke-width': 2.4 });
+    boxWithText(svg, cx, cy, 130, 55, spec.center || '', { fill: DIAGRAM_COLORS.shape, 'stroke-width': 2.4 });
     return svg;
   },
 });

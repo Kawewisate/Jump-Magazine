@@ -6,18 +6,20 @@
 <title>Diagram Gallery (dev)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles-aero.css">
 <style>
-  body { background: #EFEAE0; font-family: 'Sarabun', sans-serif; padding: 20px; }
+  body { background: transparent; font-family: 'Sarabun', sans-serif; padding: 20px; }
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
-  .card { background: #fff; border: 1px solid #E5E0D8; border-radius: 10px; padding: 14px; }
+  .card { background: rgba(247,254,255,.86); border: 1px solid rgba(255,255,255,.92); border-radius: 18px; padding: 14px; box-shadow: inset 0 2px 0 #fff, 0 8px 18px rgba(0,86,122,.16); }
   .card h3 { margin: 0 0 4px; font-size: 14px; }
   .card .status { font-size: 12px; margin-bottom: 8px; }
   .status.ok { color: #2e7d32; }
   .status.fail { color: #B3432B; }
-  .card pre.src { background: #F5F1EA; padding: 6px; font-size: 10.5px; max-height: 90px; overflow: auto; margin: 0 0 8px; }
-  .eval-summary { background: #fff; border: 1px solid #E5E0D8; border-radius: 10px; padding: 14px; margin-bottom: 20px; white-space: pre-wrap; font-size: 13px; }
+  .card pre.src { background: rgba(168,235,244,.32); border: 1px solid rgba(255,255,255,.8); border-radius: 10px; padding: 6px; font-size: 10.5px; max-height: 90px; overflow: auto; margin: 0 0 8px; }
+  .eval-summary { background: rgba(247,254,255,.86); border: 1px solid rgba(255,255,255,.92); border-radius: 18px; padding: 14px; margin-bottom: 20px; white-space: pre-wrap; font-size: 13px; box-shadow: inset 0 2px 0 #fff, 0 8px 18px rgba(0,86,122,.16); }
+  h1 { color: #fff; text-shadow: 0 2px 4px rgba(0,71,112,.35); }
 </style>
+<link rel="stylesheet" href="night-aero.css">
 </head>
 <body>
 <h1>Diagram Gallery (dev only — not linked from the app)</h1>

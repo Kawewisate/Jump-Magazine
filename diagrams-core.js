@@ -114,13 +114,46 @@ function svgEl(tag, attrs = {}, children = []) {
 
 const DIAGRAM_FONT = "Sarabun, 'Leelawadee UI', Tahoma, 'Noto Sans Thai', sans-serif";
 
+// Semantic palette shared by every SVG renderer.  Each value keeps the
+// original daylight colour as a fallback; Night Aero supplies the CSS custom
+// properties on the figure, so already-rendered diagrams switch live.
+const DIAGRAM_COLORS = Object.freeze({
+  ink: 'var(--diagram-ink, #2D2A26)',
+  muted: 'var(--diagram-muted, #6B6459)',
+  guide: 'var(--diagram-guide, #C9C2B4)',
+  grid: 'var(--diagram-grid, #EAE4D8)',
+  canvas: 'var(--diagram-canvas, #FFFFFF)',
+  shape: 'var(--diagram-shape, #FFFFFF)',
+  solid: 'var(--diagram-solid, #F5F1EA)',
+  solidAlt: 'var(--diagram-solid-alt, #EDE9E0)',
+  solidWarm: 'var(--diagram-solid-warm, #F0EBE1)',
+  warmFill: 'var(--diagram-warm-fill, #FFF3EC)',
+  table: 'var(--diagram-table, #D9CBB8)',
+  opticFill: 'var(--diagram-optic-fill, #EAF2F8)',
+  ray: 'var(--diagram-ray, #8AA0B8)',
+  onAccent: 'var(--diagram-on-accent, #FFFFFF)',
+  separator: 'var(--diagram-separator, #FFFFFF)',
+  accent: 'var(--diagram-accent, #D97757)',
+  force: 'var(--diagram-force, #B3432B)',
+  secondary: 'var(--diagram-secondary, #3B6EA5)',
+  positive: 'var(--diagram-positive, #5B8C3E)',
+  series: [
+    'var(--diagram-series-1, #D97757)',
+    'var(--diagram-series-2, #3B6EA5)',
+    'var(--diagram-series-3, #5B8C3E)',
+    'var(--diagram-series-4, #9B6BC7)',
+    'var(--diagram-series-5, #C79B3B)',
+    'var(--diagram-series-6, #B3432B)',
+  ],
+});
+
 function textEl(x, y, text, attrs = {}) {
   const t = svgEl('text', {
     x,
     y,
     'font-family': DIAGRAM_FONT,
     'font-size': 14,
-    fill: '#2D2A26',
+    fill: DIAGRAM_COLORS.ink,
     'text-anchor': 'middle',
     ...attrs,
   });
@@ -137,7 +170,7 @@ function measureTextWidth(text, fontSize = 14, fontWeight = 'normal') {
 }
 
 function arrow(x1, y1, x2, y2, attrs = {}) {
-  const { color = '#2D2A26', width = 2, markerId = ensureArrowMarker(color), dash } = attrs;
+  const { color = DIAGRAM_COLORS.ink, width = 2, markerId = ensureArrowMarker(color), dash } = attrs;
   return svgEl('line', {
     x1,
     y1,
@@ -213,9 +246,12 @@ function multilineText(x, y, text, attrs = {}) {
 
 // ---------- Rendering pipeline ----------
 
-function makeFallbackFigure(rawSource, errMessage) {
+function makeFallbackFigure(rawSource, errMessage, meta = {}) {
   const fig = document.createElement('figure');
   fig.className = 'diagram diagram-fallback';
+  if (Number.isInteger(meta.blockIndex)) fig.dataset.diagramBlockIndex = String(meta.blockIndex);
+  if (meta.blockLang) fig.dataset.diagramBlockLang = meta.blockLang;
+  fig.dataset.diagramSource = rawSource;
   const warn = document.createElement('div');
   warn.className = 'diagram-fallback-msg';
   warn.textContent = '⚠️ วาดรูปประกอบไม่สำเร็จ: ' + errMessage;
@@ -231,7 +267,7 @@ function makeFallbackFigure(rawSource, errMessage) {
   return fig;
 }
 
-async function buildDiagramFigure(spec) {
+async function buildDiagramFigure(spec, meta = {}) {
   const type = resolveDiagramType(spec.type);
   if (!type) throw new DiagramError('ไม่รู้จักชนิดรูป "' + spec.type + '"');
   const def = DIAGRAM_REGISTRY[type];
@@ -242,7 +278,11 @@ async function buildDiagramFigure(spec) {
   attachLocalDefs(svg);
   svg.setAttribute('font-family', DIAGRAM_FONT);
   const fig = document.createElement('figure');
-  fig.className = 'diagram';
+  fig.className = 'diagram diagram-' + type;
+  if (Number.isInteger(meta.blockIndex)) fig.dataset.diagramBlockIndex = String(meta.blockIndex);
+  if (meta.blockLang) fig.dataset.diagramBlockLang = meta.blockLang;
+  if (meta.rawSource != null) fig.dataset.diagramSource = meta.rawSource;
+  svg.dataset.diagramType = type;
   fig.appendChild(svg);
   if (spec.caption) {
     const cap = document.createElement('figcaption');
@@ -253,7 +293,7 @@ async function buildDiagramFigure(spec) {
 }
 
 // ดึงทุกบล็อก ```diagram หรือ ```mermaid จาก markdown ดิบ (ก่อนแปลงเป็น HTML)
-const DIAGRAM_BLOCK_PATTERN = /```(diagram|mermaid)\n([\s\S]*?)```/g;
+const DIAGRAM_BLOCK_PATTERN = /```(diagram|mermaid)\r?\n([\s\S]*?)```/g;
 
 function extractDiagramBlocks(markdownText) {
   const blocks = [];
@@ -310,12 +350,15 @@ async function ensureMermaid() {
 }
 
 let mermaidSeq = 0;
-async function renderMermaidInto(container, source) {
+async function renderMermaidInto(container, source, meta = {}) {
   const mermaid = await ensureMermaid();
   const id = 'mmd-' + Date.now() + '-' + mermaidSeq++;
   const { svg } = await mermaid.render(id, source.trim());
   const fig = document.createElement('figure');
   fig.className = 'diagram diagram-mermaid';
+  if (Number.isInteger(meta.blockIndex)) fig.dataset.diagramBlockIndex = String(meta.blockIndex);
+  fig.dataset.diagramBlockLang = 'mermaid';
+  fig.dataset.diagramSource = source;
   fig.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
   container.replaceWith(fig);
 }
@@ -330,6 +373,7 @@ function renderDiagramsIn(container) {
   );
   const preload = needsMathjs && window.ensureMathjs ? window.ensureMathjs().catch(() => {}) : Promise.resolve();
   const jobs = [];
+  let blockIndex = 0;
   for (const code of codeBlocks) {
     const cls = code.className || '';
     const isDiagram = /language-diagram\b/.test(cls);
@@ -337,22 +381,24 @@ function renderDiagramsIn(container) {
     if (!isDiagram && !isMermaid) continue;
     const pre = code.parentElement;
     const rawSource = code.textContent;
+    const meta = { blockIndex, blockLang: isMermaid ? 'mermaid' : 'diagram', rawSource };
+    blockIndex++;
     if (isMermaid) {
       jobs.push(
-        renderMermaidInto(pre, rawSource).catch((err) => {
-          pre.replaceWith(makeFallbackFigure(rawSource, err.message || String(err)));
+        renderMermaidInto(pre, rawSource, meta).catch((err) => {
+          pre.replaceWith(makeFallbackFigure(rawSource, err.message || String(err), meta));
         })
       );
     } else {
       jobs.push(
         preload
           .then(() => parseDiagramSpec(rawSource))
-          .then((spec) => buildDiagramFigure(spec))
+          .then((spec) => buildDiagramFigure(spec, meta))
           .then((fig) => {
             pre.replaceWith(fig);
           })
           .catch((err) => {
-            pre.replaceWith(makeFallbackFigure(rawSource, err.message || String(err)));
+            pre.replaceWith(makeFallbackFigure(rawSource, err.message || String(err), meta));
           })
       );
     }

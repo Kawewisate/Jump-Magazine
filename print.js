@@ -19,13 +19,20 @@ function escapeHtml(text) {
 // และตีความ * _ ในสูตรเป็นตัวเอียง ทำให้ KaTeX เรนเดอร์สูตรพัง แล้วค่อยใส่สูตรเดิมกลับหลัง sanitize
 function markdownToSafeHtml(markdownText) {
   const mathSegments = [];
-  const protectedText = markdownText.replace(CODE_OR_MATH_PATTERN, (match, code, math) => {
+  const input = String(markdownText || '');
+  let placeholderPrefix = '\uE000MATH_';
+  while (input.includes(placeholderPrefix)) placeholderPrefix += '_';
+  const protectedText = input.replace(CODE_OR_MATH_PATTERN, (match, code, math) => {
     if (code) return code;
     mathSegments.push(math);
-    return `%%MATH${mathSegments.length - 1}%%`;
+    return `${placeholderPrefix}${mathSegments.length - 1}\uE001`;
   });
   const html = DOMPurify.sanitize(marked.parse(protectedText));
-  return html.replace(/%%MATH(\d+)%%/g, (_, i) => escapeHtml(mathSegments[Number(i)]));
+  const placeholderPattern = new RegExp(`${placeholderPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)\\uE001`, 'g');
+  return html.replace(placeholderPattern, (_, i) => {
+    const segment = mathSegments[Number(i)];
+    return segment == null ? _ : escapeHtml(segment);
+  });
 }
 
 // renderDiagrams=false ใช้ตอน stream ข้อความสดๆ (ยังไม่อยากวาดรูปซ้ำๆ ระหว่างพิมพ์)
@@ -56,11 +63,15 @@ function renderMarkdownWithMath(container, markdownText, { renderDiagrams = true
 function openPrintPreview(title, markdownText) {
   document.getElementById('print-title').textContent = title;
   renderMarkdownWithMath(document.getElementById('print-body'), markdownText);
-  document.getElementById('print-overlay').classList.remove('hidden');
+  const overlay = document.getElementById('print-overlay');
+  if (window.MotionUI) window.MotionUI.openLayer(overlay);
+  else overlay.classList.remove('hidden');
 }
 
 function closePrintPreview() {
-  document.getElementById('print-overlay').classList.add('hidden');
+  const overlay = document.getElementById('print-overlay');
+  if (window.MotionUI) window.MotionUI.closeLayer(overlay);
+  else overlay.classList.add('hidden');
 }
 
 function sanitizeFilename(name) {
@@ -80,39 +91,25 @@ async function exportPdf() {
   const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
-
-  // รอให้รูปประกอบ (diagram/mermaid) วาดเสร็จก่อน ไม่งั้น html2canvas อาจ capture ตอนยังเป็นกล่องว่าง
-  const printBody = document.getElementById('print-body');
-  if (printBody.diagramsReady) {
-    try {
-      await printBody.diagramsReady;
-    } catch {
-      // เพิกเฉย — รูปที่พังจะกลายเป็นกล่อง fallback อยู่แล้วจาก renderDiagramsIn
-    }
+  try {
+    if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+    const printBody = document.getElementById('print-body');
+    if (printBody.diagramsReady) await printBody.diagramsReady.catch(() => {});
+    pageEl.classList.add('exporting-pdf');
+    const opt = {
+      filename,
+      margin: [15, 15, 15, 15],
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+    };
+    await html2pdf().set(opt).from(pageEl).save();
+  } catch (err) {
+    alert('สร้าง PDF ไม่สำเร็จ: ' + (err.message || String(err)));
+  } finally {
+    pageEl.classList.remove('exporting-pdf');
+    btn.disabled = false;
+    btn.textContent = originalLabel;
   }
-
-  pageEl.classList.add('exporting-pdf');
-
-  const opt = {
-    filename,
-    // ขอบกระดาษต้องตั้งที่ html2pdf (ใช้กับทุกหน้า) — padding ของ element มีผลแค่ต้นหน้าแรกกับท้ายหน้าสุดท้าย
-    margin: [15, 15, 15, 15],
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-  };
-
-  return html2pdf()
-    .set(opt)
-    .from(pageEl)
-    .save()
-    .catch((err) => {
-      alert('สร้าง PDF ไม่สำเร็จ: ' + err.message);
-    })
-    .finally(() => {
-      pageEl.classList.remove('exporting-pdf');
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-    });
 }

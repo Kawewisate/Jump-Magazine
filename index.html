@@ -4,36 +4,116 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ผู้ช่วยครู AI</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles-aero.css">
+<link rel="stylesheet" href="welcome-overrides.css">
+<link rel="stylesheet" href="theme-toggle.css">
+<link rel="stylesheet" href="aero-enhancements.css">
+<link rel="stylesheet" href="night-aero.css">
+<link rel="stylesheet" href="motion.css">
 </head>
 <body>
 
+<div class="aero-scene" aria-hidden="true">
+  <div class="aero-sun"></div>
+  <div class="aero-bubble bubble-one"></div>
+  <div class="aero-bubble bubble-two"></div>
+  <div class="aero-bubble bubble-three"></div>
+  <div class="aero-glint"></div>
+</div>
+
 <div id="app">
   <aside id="sidebar">
-    <div class="sidebar-header"><h1>🧑‍🏫 ผู้ช่วยครู AI</h1></div>
-    <button id="btn-new-lesson" class="mode-btn">🎨 ออกแบบสื่อการสอน</button>
-    <button id="btn-new-exercise" class="mode-btn">📝 ออกแบบแบบฝึกหัด</button>
-    <div class="sidebar-section-title">ประวัติงาน</div>
+    <div class="sidebar-header">
+      <div class="brand-mark brand-mark-sidebar" aria-hidden="true">
+        <img class="brand-mark-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+        <img class="brand-mark-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
+        <img class="brand-mark-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+      </div>
+      <div><h1>ผู้ช่วยครู AI</h1><p>ห้องทดลองการเรียนรู้</p></div>
+    </div>
+    <div class="sidebar-window-label">เริ่มงานใหม่</div>
+    <button id="btn-new-lesson" class="mode-btn"><span class="mode-icon lesson-icon" aria-hidden="true">✎</span><span><strong>ออกแบบสื่อการสอน</strong><small>แผนบทเรียน + เนื้อหาเต็ม</small></span><span class="mode-chevron" aria-hidden="true">›</span></button>
+    <button id="btn-new-exercise" class="mode-btn"><span class="mode-icon exercise-icon" aria-hidden="true">▦</span><span><strong>ออกแบบแบบฝึกหัด</strong><small>4 ระดับความยาก</small></span><span class="mode-chevron" aria-hidden="true">›</span></button>
+    <div class="sidebar-section-title">ประวัติงาน <span>ล่าสุด</span></div>
     <div id="session-list"></div>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span><strong>Night Aero</strong><small>สลับโหมดกลางคืน</small></span>
+      <span class="theme-toggle-track" aria-hidden="true"><span></span></span>
+    </button>
     <button id="btn-settings" class="settings-btn">⚙️ ตั้งค่า</button>
   </aside>
 
   <main id="main-panel">
     <div id="mobile-topbar">
       <button id="hamburger-btn" title="เมนู">☰</button>
-      <span>🧑‍🏫 ผู้ช่วยครู AI</span>
+      <span class="mobile-brand"><span class="brand-mark brand-mark-mobile" aria-hidden="true">
+        <img class="brand-mark-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+        <img class="brand-mark-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
+        <img class="brand-mark-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+      </span>ผู้ช่วยครู AI</span>
     </div>
 
     <div id="welcome-screen">
-      <h2>ยินดีต้อนรับครับ/ค่ะ 👋</h2>
-      <p>เลือกโหมดทางซ้ายเพื่อเริ่มงานใหม่ — "ออกแบบสื่อการสอน" หรือ "ออกแบบแบบฝึกหัด"</p>
+      <div class="welcome-layout">
+        <section class="welcome-copy">
+          <div class="welcome-kicker">AERO LEARNING DESK</div>
+          <h2>ยินดีต้อนรับครับ/ค่ะ <span aria-hidden="true">👋</span></h2>
+          <p>สร้างสื่อการสอนและแบบฝึกหัดที่พอดีกับห้องเรียนของคุณ ด้วยผู้ช่วย AI ที่พร้อมช่วยคิดไปด้วยกัน</p>
+          <div class="welcome-actions">
+            <button type="button" class="welcome-cta welcome-cta-primary" data-start-mode="lesson">
+              <span class="welcome-cta-icon" aria-hidden="true">✎</span>
+              <span><strong>เริ่มออกแบบสื่อ</strong><small>แผนบทเรียน + เนื้อหาเต็ม</small></span>
+              <span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="welcome-cta welcome-cta-secondary" data-start-mode="exercise">
+              <span class="welcome-cta-icon" aria-hidden="true">▦</span>
+              <span><strong>สร้างแบบฝึกหัด</strong><small>ปรับได้ 4 ระดับความยาก</small></span>
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+          <div class="welcome-note"><span aria-hidden="true">✦</span> เริ่มจากไอเดียเล็ก ๆ แล้วต่อยอดให้เป็นบทเรียนที่ใช่</div>
+        </section>
+        <div class="welcome-visual" aria-hidden="true">
+          <div class="visual-halo"></div>
+          <span class="visual-orbit orbit-one"></span>
+          <span class="visual-orbit orbit-two"></span>
+          <img class="visual-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+          <img class="visual-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
+          <img class="visual-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+          <span class="visual-spark spark-one">✦</span>
+          <span class="visual-spark spark-two">✦</span>
+        </div>
+      </div>
+      <div class="welcome-features" aria-label="จุดเด่น">
+        <article class="welcome-feature feature-green">
+          <img src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+          <div><strong>พร้อมสำหรับครู</strong><p>เริ่มจากหัวข้อหรือแนบไฟล์เดิม แล้วให้ AI ช่วยเรียบเรียง</p></div>
+        </article>
+        <article class="welcome-feature feature-blue">
+          <img src="assets/vintage/nuvola-mathematics.png" alt="" width="128" height="128">
+          <div><strong>ปรับระดับได้</strong><p>ทำแบบฝึกหัดให้เหมาะกับผู้เรียนหลายกลุ่มในครั้งเดียว</p></div>
+        </article>
+        <article class="welcome-feature feature-yellow">
+          <img src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+          <div><strong>ไอเดียใหม่เสมอ</strong><p>ต่อยอดคำถามและกิจกรรมให้ห้องเรียนมีชีวิตชีวา</p></div>
+        </article>
+      </div>
     </div>
 
     <div id="chat-view" class="hidden">
-      <div id="chat-header"><span id="session-title-display"></span></div>
+      <div id="chat-header">
+        <span class="brand-mark brand-mark-chat" aria-hidden="true">
+          <img class="brand-mark-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+          <img class="brand-mark-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
+          <img class="brand-mark-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+        </span>
+        <span id="session-title-display"></span>
+      </div>
       <div id="chat-messages"></div>
       <div id="chat-input-area">
         <div id="attach-chip" class="hidden"></div>
@@ -120,8 +200,17 @@
 <script src="diagrams-science.js"></script>
 <script src="diagrams-math.js"></script>
 <script src="diagrams-concept.js"></script>
+<script src="motion.js"></script>
 <script src="print.js"></script>
 <script src="slides.js"></script>
 <script src="app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-start-mode]').forEach((button) => {
+      button.addEventListener('click', () => newSession(button.dataset.startMode));
+    });
+    // Theme behavior is wired once by app.js through toggleTheme().
+  });
+</script>
 </body>
 </html>

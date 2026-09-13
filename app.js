@@ -22,6 +22,7 @@ const el = {
   attachInput: document.getElementById('attach-input'),
   attachChip: document.getElementById('attach-chip'),
   btnSettings: document.getElementById('btn-settings'),
+  themeToggle: document.getElementById('theme-toggle'),
   settingsModal: document.getElementById('settings-modal'),
   settingsForm: document.getElementById('settings-form'),
   settingsApiKey: document.getElementById('settings-apikey'),
@@ -37,9 +38,44 @@ const el = {
   hamburgerBtn: document.getElementById('hamburger-btn'),
 };
 
+const CHAT_SCROLL_BOTTOM_TOLERANCE = 48;
+
+function isChatNearBottom(container = el.chatMessages) {
+  if (!container) return true;
+  return container.scrollHeight - container.scrollTop - container.clientHeight <= CHAT_SCROLL_BOTTOM_TOLERANCE;
+}
+
+function scrollChatToBottom(container = el.chatMessages) {
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function captureChatScrollState() {
+  return {
+    shouldFollow: isChatNearBottom(),
+    scrollTop: el.chatMessages ? el.chatMessages.scrollTop : 0,
+  };
+}
+
+function restoreChatScrollState(state) {
+  if (!state || state.shouldFollow) {
+    scrollChatToBottom();
+    return;
+  }
+  el.chatMessages.scrollTop = state.scrollTop;
+}
+
+function updateChatDuringStream(update) {
+  const shouldFollow = isChatNearBottom();
+  update();
+  if (shouldFollow) scrollChatToBottom();
+}
+
 function init() {
+  window.addEventListener('teacherai-storage-unavailable', showStorageNotice, { once: true });
+  applyTheme(getTheme());
   renderSessionList();
   wireEvents();
+  window.MotionUI?.revealView(el.welcomeScreen);
   if (!getSettings().apiKey) {
     setTimeout(openSettingsModal, 300);
   }
@@ -54,6 +90,7 @@ function wireEvents() {
   el.btnSettings.addEventListener('click', openSettingsModal);
   el.settingsCancel.addEventListener('click', closeSettingsModal);
   el.settingsForm.addEventListener('submit', onSaveSettings);
+  el.themeToggle?.addEventListener('click', toggleTheme);
   el.printClose.addEventListener('click', closePrintPreview);
   el.printBtn.addEventListener('click', exportPdf);
   el.modelChips.forEach((chip) => {
@@ -73,11 +110,46 @@ function wireEvents() {
   });
 }
 
+function showStorageNotice() {
+  if (document.getElementById('storage-warning')) return;
+  const notice = document.createElement('div');
+  notice.id = 'storage-warning';
+  notice.className = 'storage-warning';
+  notice.textContent = 'พื้นที่เก็บข้อมูลใช้ไม่ได้ชั่วคราว งานนี้จะอยู่ในหน่วยความจำและอาจหายเมื่อรีโหลดหน้า';
+  document.body.appendChild(notice);
+}
+
+function applyTheme(theme) {
+  const isNight = theme === 'night';
+  document.documentElement.dataset.theme = isNight ? 'night' : 'day';
+  if (!el.themeToggle) return;
+  el.themeToggle.setAttribute('aria-pressed', String(isNight));
+  const icon = el.themeToggle.querySelector('.theme-toggle-icon');
+  const label = el.themeToggle.querySelector('strong');
+  const hint = el.themeToggle.querySelector('small');
+  if (icon) icon.textContent = isNight ? '☀' : '☾';
+  if (label) label.textContent = isNight ? 'Day Aero' : 'Night Aero';
+  if (hint) hint.textContent = isNight ? 'สลับโหมดกลางวัน' : 'สลับโหมดกลางคืน';
+}
+
+function toggleTheme() {
+  const next = getTheme() === 'night' ? 'day' : 'night';
+  saveTheme(next);
+  window.MotionUI?.transitionTheme(() => applyTheme(next));
+}
+
 // ---------- Sidebar / session management ----------
 
 function renderSessionList() {
   const sessions = getSessions();
   el.sessionList.innerHTML = '';
+  if (sessions.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'session-empty';
+    empty.innerHTML = '<img src="assets/vintage/nuvola-history.png" alt="" width="128" height="128"><strong>ยังไม่มีประวัติงาน</strong><span>เริ่มสร้างสื่อการสอนหรือแบบฝึกหัด แล้วผลงานจะปรากฏที่นี่</span>';
+    el.sessionList.appendChild(empty);
+    return;
+  }
   for (const s of sessions) {
     const item = document.createElement('div');
     item.className = 'session-item' + (currentSession && currentSession.id === s.id ? ' active' : '');
@@ -159,7 +231,7 @@ function newSession(mode) {
   };
   clearPendingAttachment();
   showChatView();
-  renderChatView();
+  renderChatView({ animateIntro: true });
   renderSessionList();
   el.chatInput.focus();
 }
@@ -167,11 +239,13 @@ function newSession(mode) {
 function showWelcome() {
   el.welcomeScreen.classList.remove('hidden');
   el.chatView.classList.add('hidden');
+  window.MotionUI?.revealView(el.welcomeScreen);
 }
 
 function showChatView() {
   el.welcomeScreen.classList.add('hidden');
   el.chatView.classList.remove('hidden');
+  window.MotionUI?.revealView(el.chatView);
 }
 
 function persistSession(session) {
@@ -302,7 +376,10 @@ async function requestDiagramEdit(source) {
 // เติมปุ่ม "✏️ แก้รูปนี้" ใต้รูปทุกรูปใน container (ไม่ใช้ใน PDF/สไลด์) — getContent/setContent อ่าน-เขียน markdown ต้นทาง
 function attachDiagramEditButtons(container, getContent, setContent) {
   const figures = container.querySelectorAll('figure.diagram:not(.diagram-fallback)');
-  figures.forEach((fig, idx) => {
+  figures.forEach((fig) => {
+    const blockIndex = Number(fig.dataset.diagramBlockIndex);
+    const blockLang = fig.dataset.diagramBlockLang;
+    if (!Number.isInteger(blockIndex) || blockLang !== 'diagram') return;
     if (fig.querySelector('.diagram-edit-btn')) return;
     const btn = document.createElement('button');
     btn.className = 'diagram-edit-btn';
@@ -311,18 +388,30 @@ function attachDiagramEditButtons(container, getContent, setContent) {
     btn.addEventListener('click', async () => {
       if (isBusy) return;
       const blocks = extractDiagramBlocks(getContent());
-      const target = blocks[idx];
-      if (!target) return;
+      const target = blocks[blockIndex];
+      if (!target || target.lang !== blockLang || target.source.trim() !== (fig.dataset.diagramSource || '').trim()) {
+        alert('เนื้อหารูปนี้เปลี่ยนไปแล้ว กรุณาเปิดงานใหม่แล้วลองอีกครั้ง');
+        return;
+      }
       btn.disabled = true;
       btn.textContent = '⏳ กำลังแก้ไข...';
+      const owner = currentSession;
+      const originalContent = getContent();
+      activeSession = owner;
+      setBusy(true);
       try {
         const newSource = await requestDiagramEdit(target.source);
-        if (newSource) {
-          setContent(replaceDiagramBlock(getContent(), idx, newSource, target.lang));
+        if (newSource && getContent() === originalContent) {
+          JSON.parse(newSource.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"));
+          setContent(replaceDiagramBlock(getContent(), blockIndex, newSource, target.lang));
+        } else if (newSource) {
+          throw new Error('เนื้อหารูปนี้เปลี่ยนไประหว่างแก้ไข จึงไม่ได้นำคำตอบมาใช้');
         }
       } catch (err) {
         alert('แก้รูปไม่สำเร็จ: ' + err.message);
       } finally {
+        activeSession = null;
+        setBusy(false);
         btn.disabled = false;
         btn.textContent = '✏️ แก้รูปนี้';
       }
@@ -333,30 +422,62 @@ function attachDiagramEditButtons(container, getContent, setContent) {
 
 // ---------- Chat rendering ----------
 
-function renderChatView() {
+function renderChatView({ animateMessageIndexes = [], animateIntro = false, animateExercise = false, scrollState = null } = {}) {
   el.chatMessages.innerHTML = '';
   el.sessionTitleDisplay.textContent = currentSession.title || (currentSession.mode === 'lesson' ? 'ออกแบบสื่อการสอน' : 'ออกแบบแบบฝึกหัด');
 
   if (currentSession.messages.length === 0) {
-    el.chatMessages.appendChild(buildIntroBubble());
+    const intro = buildIntroBubble();
+    el.chatMessages.appendChild(intro);
+    if (animateIntro) window.MotionUI?.reveal(intro, 'motion-enter-soft');
   }
 
   currentSession.messages.forEach((msg, idx) => {
-    el.chatMessages.appendChild(buildMessageBubble(msg, idx));
+    const message = buildMessageBubble(msg, idx);
+    el.chatMessages.appendChild(message);
+    if (animateMessageIndexes.includes(idx)) window.MotionUI?.reveal(message);
   });
 
   if (currentSession.mode === 'exercise' && currentSession.exerciseSets) {
     const levels = Object.keys(currentSession.exerciseSets);
     if (levels.length > 0) {
+      const context = document.createElement('section');
+      context.className = 'exercise-context';
+      context.setAttribute('aria-label', 'สรุปแบบฝึกหัด');
+
+      const contextIcon = document.createElement('img');
+      contextIcon.src = 'assets/vintage/nuvola-mathematics.png';
+      contextIcon.alt = '';
+      contextIcon.width = 128;
+      contextIcon.height = 128;
+
+      const contextCopy = document.createElement('div');
+      contextCopy.className = 'exercise-context-copy';
+      const contextKicker = document.createElement('span');
+      contextKicker.className = 'exercise-context-kicker';
+      contextKicker.textContent = 'แบบฝึกหัดที่สร้างจากหัวข้อ';
+      const contextTitle = document.createElement('h2');
+      contextTitle.textContent = currentSession.topicText || 'แบบฝึกหัดคณิตศาสตร์';
+      const contextHint = document.createElement('p');
+      contextHint.textContent = 'จัดชุดโจทย์ให้เหมาะกับผู้เรียน 4 ระดับความยาก';
+      contextCopy.append(contextKicker, contextTitle, contextHint);
+
+      const contextStatus = document.createElement('div');
+      contextStatus.className = 'exercise-context-status';
+      contextStatus.id = 'exercise-context-status';
+      context.append(contextIcon, contextCopy, contextStatus);
+      el.chatMessages.appendChild(context);
+      if (animateExercise) window.MotionUI?.reveal(context, 'motion-enter-soft');
+
       const wrap = document.createElement('div');
       wrap.className = 'exercise-grid';
       wrap.id = 'exercise-grid';
       el.chatMessages.appendChild(wrap);
-      levels.forEach((level) => renderExerciseCard(Number(level)));
+      levels.forEach((level) => renderExerciseCard(Number(level), { animate: animateExercise }));
     }
   }
 
-  el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
+  restoreChatScrollState(scrollState);
 }
 
 function buildIntroBubble() {
@@ -526,10 +647,9 @@ function sendLessonTurn(userText, attachment, isConfirmTrigger) {
     attachmentName: attachment ? attachment.name : undefined,
   };
   currentSession.messages.push(userMsg);
-  renderChatView();
   persistSession(currentSession);
 
-  runLessonCompletion();
+  runLessonCompletion(false, [currentSession.messages.length - 1]);
 }
 
 function confirmLessonPlan() {
@@ -540,12 +660,11 @@ function confirmLessonPlan() {
     displayContent: '✅ ยืนยันแผนแล้ว สร้างเนื้อหาเต็ม',
   };
   currentSession.messages.push(userMsg);
-  renderChatView();
   persistSession(currentSession);
-  runLessonCompletion(true);
+  runLessonCompletion(true, [currentSession.messages.length - 1]);
 }
 
-function runLessonCompletion(isFinalStep) {
+function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
   // ผูกกับ session ที่เริ่มเจน ไม่ใช่ currentSession — ผู้ใช้อาจสลับไปดูงานอื่นระหว่างรอ
   const session = currentSession;
   activeSession = session;
@@ -558,57 +677,66 @@ function runLessonCompletion(isFinalStep) {
   const assistantMsg = { role: 'assistant', content: '', reasoning: '', isFinalAttempt: !!isFinalStep };
   session.messages.push(assistantMsg);
   const idx = session.messages.length - 1;
-  renderChatView();
+  renderChatView({ animateMessageIndexes: [...animateMessageIndexes, idx] });
   const isViewing = () => currentSession === session;
   const bubbleEl = () => (isViewing() ? document.querySelector(`#msg-${idx} .msg-bubble`) : null);
 
   const finish = () => {
+    const scrollState = isViewing() ? captureChatScrollState() : null;
     activeSession = null;
     setBusy(false);
     persistSession(session);
-    if (isViewing()) renderChatView();
+    if (isViewing()) renderChatView({ scrollState });
   };
 
   callOpenRouterStream(apiMessages, {
     onReasoningToken: (chunk) => {
-      assistantMsg.reasoning += chunk;
-      const b = bubbleEl();
-      if (b) {
-        let r = b.querySelector('.reasoning-block');
-        if (!r) {
-          r = document.createElement('div');
-          r.className = 'reasoning-block';
-          b.prepend(r);
+      updateChatDuringStream(() => {
+        assistantMsg.reasoning += chunk;
+        const b = bubbleEl();
+        if (b) {
+          let r = b.querySelector('.reasoning-block');
+          if (!r) {
+            r = document.createElement('div');
+            r.className = 'reasoning-block';
+            b.prepend(r);
+          }
+          r.textContent = '🧠 ' + assistantMsg.reasoning;
         }
-        r.textContent = '🧠 ' + assistantMsg.reasoning;
-      }
+      });
     },
     onToken: (_delta, fullText) => {
-      assistantMsg.content = fullText;
-      const b = bubbleEl();
-      if (b) {
-        let c = b.querySelector('.markdown-body');
-        if (!c) {
-          c = document.createElement('div');
-          c.className = 'markdown-body streaming';
-          b.appendChild(c);
+      updateChatDuringStream(() => {
+        assistantMsg.content = fullText;
+        const b = bubbleEl();
+        if (b) {
+          let c = b.querySelector('.markdown-body');
+          if (!c) {
+            c = document.createElement('div');
+            c.className = 'markdown-body streaming';
+            b.appendChild(c);
+          }
+          c.textContent = displayStreamingText(fullText);
         }
-        c.textContent = displayStreamingText(fullText);
-      }
+      });
     },
     onDone: async (fullText) => {
       assistantMsg.content = fullText;
       if (isFinalStep) {
         const b = bubbleEl();
         if (b) {
-          const c = b.querySelector('.markdown-body');
-          if (c) c.textContent = '🔧 กำลังตรวจรูปประกอบ...';
+          updateChatDuringStream(() => {
+            const c = b.querySelector('.markdown-body');
+            if (c) c.textContent = '🔧 กำลังตรวจรูปประกอบ...';
+          });
         }
         try {
           const { content: repaired } = await autoRepairDiagrams(fullText, (status) => {
-            const bb = bubbleEl();
-            const cc = bb && bb.querySelector('.markdown-body');
-            if (cc) cc.textContent = status;
+            updateChatDuringStream(() => {
+              const bb = bubbleEl();
+              const cc = bb && bb.querySelector('.markdown-body');
+              if (cc) cc.textContent = status;
+            });
           });
           assistantMsg.content = repaired;
         } catch (err) {
@@ -638,10 +766,10 @@ function retryLessonCompletion(idx) {
 // ---------- Mode 2: ออกแบบแบบฝึกหัด ----------
 
 const EXERCISE_LEVEL_LABELS = {
-  1: 'ระดับ 1: ง่ายมาก (ปูพื้นฐาน)',
-  2: 'ระดับ 2: ปานกลาง',
-  3: 'ระดับ 3: ประยุกต์',
-  4: 'ระดับ 4: ศึกษาต่อ (ยากที่สุด)',
+  1: 'ระดับ 1 · พื้นฐาน',
+  2: 'ระดับ 2 · เข้าใจ',
+  3: 'ระดับ 3 · ประยุกต์',
+  4: 'ระดับ 4 · ท้าทาย',
 };
 
 function startExerciseGeneration(topicText, attachment) {
@@ -655,7 +783,7 @@ function startExerciseGeneration(topicText, attachment) {
   currentSession.topicText = topicText;
   currentSession.attachment = attachment || null;
   currentSession.exerciseSets = { 1: { status: 'pending', content: '' }, 2: { status: 'pending', content: '' }, 3: { status: 'pending', content: '' }, 4: { status: 'pending', content: '' } };
-  renderChatView();
+  renderChatView({ animateMessageIndexes: [currentSession.messages.length - 1], animateExercise: true });
   persistSession(currentSession);
 
   runExerciseQueue([1, 2, 3, 4]);
@@ -745,7 +873,7 @@ function regenerateExerciseLevel(level) {
   runExerciseQueue([level]);
 }
 
-function renderExerciseCard(level) {
+function renderExerciseCard(level, { animate = false } = {}) {
   const grid = document.getElementById('exercise-grid');
   if (!grid) return;
   const set = currentSession.exerciseSets[level];
@@ -760,9 +888,26 @@ function renderExerciseCard(level) {
       <div class="exercise-card-footer" id="exercise-footer-${level}"></div>
     `;
     grid.appendChild(card);
+    if (animate) window.MotionUI?.reveal(card);
   }
   updateExerciseCardBody(level);
   updateExerciseCardFooter(level);
+  updateExerciseContextStatus();
+}
+
+function updateExerciseContextStatus() {
+  const status = document.getElementById('exercise-context-status');
+  if (!status || !currentSession || !currentSession.exerciseSets) return;
+  const sets = Object.values(currentSession.exerciseSets);
+  const done = sets.filter((set) => set.status === 'done').length;
+  const hasError = sets.some((set) => set.status === 'error');
+  status.textContent = done === sets.length && sets.length > 0
+    ? '✓ สร้างครบ 4 ระดับแล้ว'
+    : hasError
+      ? `สร้างแล้ว ${done}/${sets.length} ระดับ · มีบางชุดต้องลองใหม่`
+      : `กำลังสร้าง ${done}/${sets.length} ระดับ`;
+  status.classList.toggle('is-complete', done === sets.length && sets.length > 0);
+  status.classList.toggle('has-error', hasError);
 }
 
 function updateExerciseCardBody(level) {
@@ -836,11 +981,13 @@ function openSettingsModal() {
   el.settingsModel.value = s.model;
   el.settingsReasoning.value = s.reasoningEffort;
   updateModelChipHighlight();
-  el.settingsModal.classList.remove('hidden');
+  if (window.MotionUI) window.MotionUI.openLayer(el.settingsModal);
+  else el.settingsModal.classList.remove('hidden');
 }
 
 function closeSettingsModal() {
-  el.settingsModal.classList.add('hidden');
+  if (window.MotionUI) window.MotionUI.closeLayer(el.settingsModal);
+  else el.settingsModal.classList.add('hidden');
 }
 
 function onSaveSettings(e) {

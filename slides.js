@@ -5,7 +5,8 @@ const SLIDE_W = 1280;
 const SLIDE_H = 720;
 const SLIDE_CONTENT_H = 560; // เผื่อ header/padding
 
-let slideState = { slides: [], index: 0, title: '' };
+let slideState = { slides: [], index: 0, title: '', ready: false };
+let slideBuildSeq = 0;
 
 function getSlideEls() {
   return {
@@ -41,15 +42,24 @@ document.addEventListener('DOMContentLoaded', wireSlideEvents);
 // สร้าง DOM สไลด์ทั้งหมดจาก markdown ฉบับเต็ม แล้วเปิด overlay
 async function openSlideView(title, markdownText) {
   const el = getSlideEls();
-  el.overlay.classList.remove('hidden');
+  const buildToken = ++slideBuildSeq;
+  slideState = { slides: [], index: 0, title: '', ready: false };
+  el.prevBtn.disabled = true;
+  el.nextBtn.disabled = true;
+  el.pdfBtn.disabled = true;
+  if (window.MotionUI) window.MotionUI.openLayer(el.overlay);
+  else el.overlay.classList.remove('hidden');
   el.stage.innerHTML = '<div class="slide-loading">กำลังจัดสไลด์...</div>';
 
   try {
     slideState = await buildSlides(title, markdownText);
+    if (buildToken !== slideBuildSeq) return;
   } catch (err) {
+    if (buildToken !== slideBuildSeq) return;
     el.stage.innerHTML = `<div class="slide-loading">สร้างสไลด์ไม่สำเร็จ: ${escapeHtml(err.message || String(err))}</div>`;
     return;
   }
+  slideState.ready = true;
   slideState.index = 0;
   renderAllSlides();
   gotoSlide(0);
@@ -58,7 +68,10 @@ async function openSlideView(title, markdownText) {
 
 function closeSlideView() {
   const el = getSlideEls();
-  el.overlay.classList.add('hidden');
+  slideBuildSeq++;
+  slideState = { slides: [], index: 0, title: '', ready: false };
+  if (window.MotionUI) window.MotionUI.closeLayer(el.overlay);
+  else el.overlay.classList.add('hidden');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
@@ -78,8 +91,8 @@ async function buildSlides(title, markdownText) {
   measure.className = 'slide-measure';
   measure.style.cssText = `position:fixed; left:-9999px; top:0; width:${SLIDE_W}px;`;
   document.body.appendChild(measure);
-
-  const bodyHtml = markdownToSafeHtml(markdownText || '');
+  try {
+    const bodyHtml = markdownToSafeHtml(markdownText || '');
   const parsed = document.createElement('div');
   parsed.innerHTML = bodyHtml;
   measure.appendChild(parsed);
@@ -147,8 +160,10 @@ async function buildSlides(title, markdownText) {
     measured.push(...chunks);
   }
 
-  document.body.removeChild(measure);
-  return { slides: measured, index: 0, title };
+    return { slides: measured, index: 0, title, ready: false };
+  } finally {
+    measure.remove();
+  }
 }
 
 function renderAllSlides() {
@@ -193,6 +208,8 @@ function gotoSlide(i) {
   const el = getSlideEls();
   Array.from(el.stage.children).forEach((c, idx) => {
     c.classList.toggle('active', idx === slideState.index);
+    c.classList.toggle('is-before', idx < slideState.index);
+    c.classList.toggle('is-after', idx > slideState.index);
   });
   el.counter.textContent = `${slideState.index + 1} / ${total}`;
   el.prevBtn.disabled = slideState.index === 0;
@@ -211,32 +228,36 @@ function fitSlideViewport() {
 
 async function exportSlidesPdf() {
   const el = getSlideEls();
+  if (!slideState.ready || !slideState.slides.length) return;
   const btn = el.pdfBtn;
   const original = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
   const container = document.createElement('div');
-  slideState.slides.forEach((_, i) => {
-    const page = el.stage.children[i].cloneNode(true);
-    page.classList.add('slide-pdf-page');
-    page.style.transform = 'none';
-    container.appendChild(page);
-  });
-  document.body.appendChild(container);
-  const opt = {
-    filename: sanitizeFilename(slideState.title || 'สไลด์') + '.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-    jsPDF: { unit: 'px', format: [SLIDE_W, SLIDE_H], orientation: 'landscape' },
-    pagebreak: { mode: ['css'], before: '.slide-pdf-page' },
-    margin: 0,
-  };
+  let containerAttached = false;
   try {
+    if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+    slideState.slides.forEach((_, i) => {
+      const page = el.stage.children[i].cloneNode(true);
+      page.classList.add('slide-pdf-page');
+      page.style.transform = 'none';
+      container.appendChild(page);
+    });
+    document.body.appendChild(container);
+    containerAttached = true;
+    const opt = {
+      filename: sanitizeFilename(slideState.title || 'สไลด์') + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'px', format: [SLIDE_W, SLIDE_H], orientation: 'landscape' },
+      pagebreak: { mode: ['css'], before: '.slide-pdf-page' },
+      margin: 0,
+    };
     await html2pdf().set(opt).from(container).save();
   } catch (err) {
     alert('สร้าง PDF สไลด์ไม่สำเร็จ: ' + err.message);
   } finally {
-    document.body.removeChild(container);
+    if (containerAttached) container.remove();
     btn.disabled = false;
     btn.textContent = original;
   }

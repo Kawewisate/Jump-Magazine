@@ -1,9 +1,9 @@
 // Renderers: blocks, incline, pulley, fbd, circuit, optics, atom, molecule
 
-const SCI_STROKE = '#2D2A26';
-const SCI_ACCENT = '#D97757';
-const SCI_FORCE = '#B3432B';
-const SCI_TENSION = '#3B6EA5';
+const SCI_STROKE = DIAGRAM_COLORS.ink;
+const SCI_ACCENT = DIAGRAM_COLORS.accent;
+const SCI_FORCE = DIAGRAM_COLORS.force;
+const SCI_TENSION = DIAGRAM_COLORS.secondary;
 
 function hatchPattern(id, angle = 45) {
   return svgEl(
@@ -89,7 +89,7 @@ registerDiagram({
           y: b._y,
           width: b._w,
           height: b._h,
-          fill: '#FFFFFF',
+          fill: DIAGRAM_COLORS.shape,
           stroke: SCI_STROKE,
           'stroke-width': 2,
           rx: 3,
@@ -147,7 +147,7 @@ registerDiagram({
     const baseY = 260, baseX1 = 30, baseX2 = 380;
     const topX = baseX1, topY = baseY - (baseX2 - baseX1) * Math.tan(angle);
     const svg = baseSvg(W, H);
-    svg.appendChild(svgEl('polygon', { points: `${baseX1},${topY} ${baseX2},${baseY} ${baseX1},${baseY}`, fill: '#F0EBE1', stroke: SCI_STROKE, 'stroke-width': 2 }));
+    svg.appendChild(svgEl('polygon', { points: `${baseX1},${topY} ${baseX2},${baseY} ${baseX1},${baseY}`, fill: DIAGRAM_COLORS.solidWarm, stroke: SCI_STROKE, 'stroke-width': 2 }));
     svg.appendChild(groundHatch(baseX1, baseX2, baseY, 'incline-ground'));
     // มุม arc
     svg.appendChild(svgEl('path', { d: `M ${baseX1 + 40} ${baseY} A 40 40 0 0 0 ${baseX1 + 40 * Math.cos(angle)} ${baseY - 40 * Math.sin(angle)}`, fill: 'none', stroke: SCI_STROKE, 'stroke-width': 1.2 }));
@@ -161,7 +161,7 @@ registerDiagram({
     const cx = bx - (bw / 2) * Math.sin(angle);
     const cy = by - (bh / 2) * Math.cos(angle) - 2;
     const g = svgEl('g', { transform: `translate(${cx} ${cy}) rotate(${-(spec.angle || 30)})` });
-    g.appendChild(svgEl('rect', { x: -bw / 2, y: -bh, width: bw, height: bh, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+    g.appendChild(svgEl('rect', { x: -bw / 2, y: -bh, width: bw, height: bh, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
     g.appendChild(textEl(0, -bh / 2 + 5, spec.label || 'm', { 'font-size': 13 }));
     svg.appendChild(g);
 
@@ -182,14 +182,14 @@ registerDiagram({
       svg.appendChild(textEl(originX + px * 58, originY + py * 58 - 6, 'f', { fill: SCI_ACCENT, 'font-size': 13 }));
     }
     if (forces.includes('applied')) {
-      svg.appendChild(arrow(originX, originY, originX - px * 50, originY - py * 50, { color: '#5B8C3E' }));
-      svg.appendChild(textEl(originX - px * 62, originY - py * 62, spec.appliedLabel || 'F', { fill: '#5B8C3E', 'font-size': 13 }));
+      svg.appendChild(arrow(originX, originY, originX - px * 50, originY - py * 50, { color: DIAGRAM_COLORS.positive }));
+      svg.appendChild(textEl(originX - px * 62, originY - py * 62, spec.appliedLabel || 'F', { fill: DIAGRAM_COLORS.positive, 'font-size': 13 }));
     }
     if (spec.pulley) {
-      svg.appendChild(svgEl('circle', { cx: topX, cy: topY, r: 10, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('circle', { cx: topX, cy: topY, r: 10, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: bx, y1: by - bh * Math.cos(angle), x2: topX, y2: topY, stroke: SCI_TENSION, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: topX + 10, y1: topY, x2: topX + 10, y2: topY + 70, stroke: SCI_TENSION, 'stroke-width': 2 }));
-      svg.appendChild(svgEl('rect', { x: topX - 5, y: topY + 70, width: 30, height: 30, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('rect', { x: topX - 5, y: topY + 70, width: 30, height: 30, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(textEl(topX + 10, topY + 90, spec.hangingLabel || 'M', { 'font-size': 12 }));
     }
     return svg;
@@ -207,25 +207,25 @@ registerDiagram({
     const svg = baseSvg(320, 300);
     if (spec.style === 'table') {
       const tableY = 150, tableX1 = 30, tableX2 = 220;
-      svg.appendChild(svgEl('rect', { x: tableX1, y: tableY, width: tableX2 - tableX1, height: 10, fill: '#D9CBB8', stroke: SCI_STROKE }));
+      svg.appendChild(svgEl('rect', { x: tableX1, y: tableY, width: tableX2 - tableX1, height: 10, fill: DIAGRAM_COLORS.table, stroke: SCI_STROKE }));
       svg.appendChild(svgEl('line', { x1: tableX1 + 10, y1: tableY + 10, x2: tableX1 + 10, y2: 270, stroke: SCI_STROKE, 'stroke-width': 3 }));
-      svg.appendChild(svgEl('rect', { x: 100, y: tableY - 35, width: 50, height: 35, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('rect', { x: 100, y: tableY - 35, width: 50, height: 35, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(textEl(125, tableY - 15, spec.table || 'm1', { 'font-size': 12 }));
-      svg.appendChild(svgEl('circle', { cx: tableX2, cy: tableY - 10, r: 12, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('circle', { cx: tableX2, cy: tableY - 10, r: 12, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: 150, y1: tableY - 17, x2: tableX2 - 12, y2: tableY - 10, stroke: SCI_TENSION, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: tableX2 + 12, y1: tableY - 10, x2: tableX2 + 12, y2: tableY + 60, stroke: SCI_TENSION, 'stroke-width': 2 }));
-      svg.appendChild(svgEl('rect', { x: tableX2 - 3, y: tableY + 60, width: 30, height: 40, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('rect', { x: tableX2 - 3, y: tableY + 60, width: 30, height: 40, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(textEl(tableX2 + 12, tableY + 85, spec.hanging || 'm2', { 'font-size': 12 }));
     } else {
       const cx = 160, cy = 40, r = 18;
-      svg.appendChild(svgEl('circle', { cx, cy, r, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('circle', { cx, cy, r, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: cx - 4, y1: cy - r - 20, x2: cx - 4, y2: cy - r, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: cx + 4, y1: cy - r - 20, x2: cx + 4, y2: cy - r, stroke: SCI_STROKE, 'stroke-width': 2 }));
       svg.appendChild(svgEl('line', { x1: cx - 10, y1: cy - r - 20, x2: cx + 10, y2: cy - r - 20, stroke: SCI_STROKE, 'stroke-width': 3 }));
       [-1, 1].forEach((side) => {
         const x = cx + side * r;
         svg.appendChild(svgEl('line', { x1: x, y1: cy, x2: x, y2: 180, stroke: SCI_TENSION, 'stroke-width': 2 }));
-        svg.appendChild(svgEl('rect', { x: x - 20, y: 180, width: 40, height: 45, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+        svg.appendChild(svgEl('rect', { x: x - 20, y: 180, width: 40, height: 45, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
         svg.appendChild(textEl(x, 205, side < 0 ? spec.left || 'm1' : spec.right || 'm2', { 'font-size': 12 }));
       });
     }
@@ -246,8 +246,8 @@ registerDiagram({
     const cx = size / 2, cy = size / 2;
     const svg = baseSvg(size, size);
     if (spec.axes) {
-      svg.appendChild(svgEl('line', { x1: 15, y1: cy, x2: size - 15, y2: cy, stroke: '#C9C2B4', 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
-      svg.appendChild(svgEl('line', { x1: cx, y1: 15, x2: cx, y2: size - 15, stroke: '#C9C2B4', 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+      svg.appendChild(svgEl('line', { x1: 15, y1: cy, x2: size - 15, y2: cy, stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+      svg.appendChild(svgEl('line', { x1: cx, y1: 15, x2: cx, y2: size - 15, stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
     }
     svg.appendChild(svgEl('circle', { cx, cy, r: 5, fill: SCI_STROKE }));
     (spec.forces || []).forEach((f) => {
@@ -332,7 +332,7 @@ registerDiagram({
         }
         svg.appendChild(svgEl('polyline', { points: pts.join(' '), fill: 'none', stroke: SCI_STROKE, 'stroke-width': 2 }));
       } else if (kind === 'bulb') {
-        svg.appendChild(svgEl('circle', { cx, cy: y, r: w / 2, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+        svg.appendChild(svgEl('circle', { cx, cy: y, r: w / 2, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
         svg.appendChild(svgEl('line', { x1: cx - 12, y1: y - 12, x2: cx + 12, y2: y + 12, stroke: SCI_STROKE, 'stroke-width': 1.5 }));
         svg.appendChild(svgEl('line', { x1: cx - 12, y1: y + 12, x2: cx + 12, y2: y - 12, stroke: SCI_STROKE, 'stroke-width': 1.5 }));
       } else if (kind === 'switch') {
@@ -340,13 +340,13 @@ registerDiagram({
         svg.appendChild(svgEl('circle', { cx: cx + w / 2, cy: y, r: 3, fill: SCI_STROKE }));
         svg.appendChild(svgEl('line', { x1: cx - w / 2, y1: y, x2: cx + w / 2 - 6, y2: y - 14, stroke: SCI_STROKE, 'stroke-width': 2 }));
       } else if (kind === 'ammeter' || kind === 'voltmeter') {
-        svg.appendChild(svgEl('circle', { cx, cy: y, r: w / 2, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+        svg.appendChild(svgEl('circle', { cx, cy: y, r: w / 2, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
         svg.appendChild(textEl(cx, y + 5, kind === 'ammeter' ? 'A' : 'V', { 'font-size': 14, 'font-weight': 'bold' }));
       } else if (kind === 'capacitor') {
         svg.appendChild(svgEl('line', { x1: cx - 5, y1: y - 16, x2: cx - 5, y2: y + 16, stroke: SCI_STROKE, 'stroke-width': 2.5 }));
         svg.appendChild(svgEl('line', { x1: cx + 5, y1: y - 16, x2: cx + 5, y2: y + 16, stroke: SCI_STROKE, 'stroke-width': 2.5 }));
       } else if (kind === 'diode') {
-        svg.appendChild(svgEl('polygon', { points: `${cx - 12},${y - 12} ${cx - 12},${y + 12} ${cx + 12},${y}`, fill: '#fff', stroke: SCI_STROKE, 'stroke-width': 2 }));
+        svg.appendChild(svgEl('polygon', { points: `${cx - 12},${y - 12} ${cx - 12},${y + 12} ${cx + 12},${y}`, fill: DIAGRAM_COLORS.shape, stroke: SCI_STROKE, 'stroke-width': 2 }));
         svg.appendChild(svgEl('line', { x1: cx + 12, y1: y - 12, x2: cx + 12, y2: y + 12, stroke: SCI_STROKE, 'stroke-width': 2 }));
       }
       if (label) svg.appendChild(textEl(cx, y - w / 2 - 10, label, { 'font-size': 12 }));
@@ -401,7 +401,7 @@ registerDiagram({
     const doD = spec.objectDist || 70;
     const hO = spec.objectHeight || 30;
     const svg = baseSvg(W, H);
-    svg.appendChild(svgEl('line', { x1: 10, y1: axisY, x2: W - 10, y2: axisY, stroke: '#C9C2B4', 'stroke-width': 1 }));
+    svg.appendChild(svgEl('line', { x1: 10, y1: axisY, x2: W - 10, y2: axisY, stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1 }));
     const isMirror = (spec.device || '').includes('mirror');
     const isConvexLike = (spec.device || 'convex-lens').startsWith('convex');
 
@@ -412,7 +412,7 @@ registerDiagram({
       svg.appendChild(
         svgEl('path', {
           d: `M ${centerX} 20 Q ${centerX + curve} ${axisY} ${centerX} ${H - 20} Q ${centerX - curve} ${axisY} ${centerX} 20`,
-          fill: '#EAF2F8',
+          fill: DIAGRAM_COLORS.opticFill,
           stroke: SCI_STROKE,
           'stroke-width': 2,
         })
@@ -431,8 +431,8 @@ registerDiagram({
 
     // object arrow (ซ้ายของเลนส์/กระจก)
     const oX = centerX - doD;
-    svg.appendChild(arrow(oX, axisY, oX, axisY - hO, { color: '#5B8C3E' }));
-    svg.appendChild(textEl(oX, axisY - hO - 8, 'วัตถุ', { fill: '#5B8C3E', 'font-size': 11 }));
+    svg.appendChild(arrow(oX, axisY, oX, axisY - hO, { color: DIAGRAM_COLORS.positive }));
+    svg.appendChild(textEl(oX, axisY - hO - 8, 'วัตถุ', { fill: DIAGRAM_COLORS.positive, 'font-size': 11 }));
 
     // 1/f = 1/do + 1/di  ->  di = f*do/(do-f)
     let di, magnitude, real;
@@ -454,10 +454,10 @@ registerDiagram({
       svg.appendChild(arrow(iX, axisY, iX, axisY + dir * magnitude, { color: SCI_FORCE, dash }));
       svg.appendChild(textEl(iX, axisY + dir * magnitude + (dir > 0 ? 16 : -8), real ? 'ภาพจริง' : 'ภาพเสมือน', { fill: SCI_FORCE, 'font-size': 11 }));
       // principal rays
-      svg.appendChild(svgEl('line', { x1: oX, y1: axisY - hO, x2: centerX, y2: axisY - hO, stroke: '#8AA0B8', 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
-      svg.appendChild(svgEl('line', { x1: centerX, y1: axisY - hO, x2: iX, y2: axisY + dir * magnitude, stroke: '#8AA0B8', 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
-      svg.appendChild(svgEl('line', { x1: oX, y1: axisY - hO, x2: centerX, y2: axisY, stroke: '#8AA0B8', 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
-      svg.appendChild(svgEl('line', { x1: centerX, y1: axisY, x2: iX, y2: axisY + dir * magnitude, stroke: '#8AA0B8', 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
+      svg.appendChild(svgEl('line', { x1: oX, y1: axisY - hO, x2: centerX, y2: axisY - hO, stroke: DIAGRAM_COLORS.ray, 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
+      svg.appendChild(svgEl('line', { x1: centerX, y1: axisY - hO, x2: iX, y2: axisY + dir * magnitude, stroke: DIAGRAM_COLORS.ray, 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
+      svg.appendChild(svgEl('line', { x1: oX, y1: axisY - hO, x2: centerX, y2: axisY, stroke: DIAGRAM_COLORS.ray, 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
+      svg.appendChild(svgEl('line', { x1: centerX, y1: axisY, x2: iX, y2: axisY + dir * magnitude, stroke: DIAGRAM_COLORS.ray, 'stroke-width': 1, 'stroke-dasharray': '3,2' }));
     }
     return svg;
   },
@@ -475,10 +475,10 @@ registerDiagram({
     const cx = size, cy = size;
     const svg = baseSvg(size * 2, size * 2);
     svg.appendChild(svgEl('circle', { cx, cy, r: 10, fill: SCI_ACCENT }));
-    svg.appendChild(textEl(cx, cy + 4, spec.element || '', { fill: '#fff', 'font-size': 11, 'font-weight': 'bold' }));
+    svg.appendChild(textEl(cx, cy + 4, spec.element || '', { fill: DIAGRAM_COLORS.onAccent, 'font-size': 11, 'font-weight': 'bold' }));
     shells.forEach((count, i) => {
       const r = 35 + i * 32;
-      svg.appendChild(svgEl('circle', { cx, cy, r, fill: 'none', stroke: '#C9C2B4', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('circle', { cx, cy, r, fill: 'none', stroke: DIAGRAM_COLORS.guide, 'stroke-width': 1 }));
       for (let k = 0; k < count; k++) {
         const ang = (2 * Math.PI * k) / count + i * 0.3;
         const ex = cx + r * Math.cos(ang);
@@ -509,18 +509,22 @@ registerDiagram({
     // molecule ต้อง async โหลด SmilesDrawer แต่ registry คาดว่า render คืน element ทันที
     // จึงคืน placeholder แล้วอัปเดตทีหลังเมื่อโหลดเสร็จ (renderDiagramsIn จะรอ moleculeReady ด้วย)
     const holder = svgEl('svg', { viewBox: '0 0 300 250', width: 300, height: 250 });
-    const placeholderText = textEl(150, 125, 'กำลังวาดโครงสร้าง...', { 'font-size': 12, fill: '#6B6459' });
+    const placeholderText = textEl(150, 125, 'กำลังวาดโครงสร้าง...', { 'font-size': 12, fill: DIAGRAM_COLORS.muted });
     holder.appendChild(placeholderText);
     holder._moleculePending = ensureSmilesDrawer().then(() => {
       return new Promise((resolve, reject) => {
         try {
           const options = { width: 300, height: 250, bondThickness: 1.2, atomVisualization: 'default' };
-          const drawer = new window.SmilesDrawer.SvgDrawer(options);
           window.SmilesDrawer.parse(
             spec.smiles,
             (tree) => {
               while (holder.firstChild) holder.removeChild(holder.firstChild);
-              drawer.draw(tree, holder, 'light', null);
+              const lightLayer = baseSvg(300, 250, { class: 'molecule-layer molecule-layer-light' });
+              const darkLayer = baseSvg(300, 250, { class: 'molecule-layer molecule-layer-dark' });
+              new window.SmilesDrawer.SvgDrawer(options).draw(tree, lightLayer, 'light', null);
+              new window.SmilesDrawer.SvgDrawer(options).draw(tree, darkLayer, 'dark', null);
+              holder.appendChild(lightLayer);
+              holder.appendChild(darkLayer);
               resolve();
             },
             (err) => reject(new DiagramError('SMILES ไม่ถูกต้อง: ' + err))

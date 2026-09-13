@@ -109,6 +109,10 @@ async function callOpenRouterStream(messages, callbacks) {
   }
 
   let fullText = '';
+  let sawDone = false;
+  let finishReason = null;
+  let terminalCallbackSent = false;
+  let reader = null;
   try {
     const resp = await fetch(OPENROUTER_URL, {
       method: 'POST',
@@ -133,9 +137,13 @@ async function callOpenRouterStream(messages, callbacks) {
 
     const handleLine = (line) => {
       const trimmed = line.trim();
+      if (trimmed.startsWith(':')) return;
       if (!trimmed.startsWith('data:')) return;
       const data = trimmed.slice(5).trim();
-      if (data === '[DONE]') return;
+      if (data === '[DONE]') {
+        sawDone = true;
+        return;
+      }
       let json;
       try {
         json = JSON.parse(data);
@@ -147,6 +155,8 @@ async function callOpenRouterStream(messages, callbacks) {
         throw new Error(`โมเดลตอบกลับด้วยข้อผิดพลาด: ${json.error.message || JSON.stringify(json.error)}`);
       }
       const delta = json.choices && json.choices[0] && json.choices[0].delta;
+      const choice = json.choices && json.choices[0];
+      if (choice && choice.finish_reason) finishReason = choice.finish_reason;
       if (!delta) return;
       if (delta.reasoning) {
         safeCallback(onReasoningToken, delta.reasoning);
@@ -157,7 +167,7 @@ async function callOpenRouterStream(messages, callbacks) {
       }
     };
 
-    const reader = resp.body.getReader();
+    reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -172,13 +182,23 @@ async function callOpenRouterStream(messages, callbacks) {
     buffer += decoder.decode();
     if (buffer) handleLine(buffer);
 
-    if (!fullText) {
+    if (!sawDone) {
+      throw new Error('การตอบกลับถูกตัดกลางคันก่อนโมเดลส่งสัญญาณจบ ลองใหม่อีกครั้ง');
+    }
+    if (finishReason && !['stop'].includes(finishReason)) {
+      throw new Error(`โมเดลจบการตอบกลับด้วยเหตุผล "${finishReason}" จึงยังใช้คำตอบนี้ไม่ได้`);
+    }
+    if (!fullText.trim()) {
       throw new Error('โมเดลไม่ส่งคำตอบกลับมา ลองใหม่อีกครั้ง หรือเปลี่ยนโมเดลในหน้าตั้งค่า');
     }
   } catch (err) {
+    try { await reader?.cancel(); } catch {}
     safeCallback(onError, err);
     return;
   }
 
-  safeCallback(onDone, fullText);
+  if (!terminalCallbackSent) {
+    terminalCallbackSent = true;
+    safeCallback(onDone, fullText);
+  }
 }

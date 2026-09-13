@@ -1,9 +1,9 @@
 // Renderers: graph, geometry, solid, numberline, chart, venn, tree, fraction
 
-const MATH_STROKE = '#2D2A26';
-const MATH_ACCENT = '#D97757';
-const MATH_LINE2 = '#3B6EA5';
-const PALETTE = ['#D97757', '#3B6EA5', '#5B8C3E', '#9B6BC7', '#C79B3B', '#B3432B'];
+const MATH_STROKE = DIAGRAM_COLORS.ink;
+const MATH_ACCENT = DIAGRAM_COLORS.accent;
+const MATH_LINE2 = DIAGRAM_COLORS.secondary;
+const PALETTE = DIAGRAM_COLORS.series;
 
 // ===================== graph (function/axes plot) =====================
 let mathjsReady = null;
@@ -38,10 +38,10 @@ registerDiagram({
 
     if (spec.grid !== false) {
       for (let gx = Math.ceil(xMin); gx <= xMax; gx++) {
-        svg.appendChild(svgEl('line', { x1: sx(gx), y1: pad, x2: sx(gx), y2: H - pad, stroke: '#EAE4D8', 'stroke-width': 1 }));
+        svg.appendChild(svgEl('line', { x1: sx(gx), y1: pad, x2: sx(gx), y2: H - pad, stroke: DIAGRAM_COLORS.grid, 'stroke-width': 1 }));
       }
       for (let gy = Math.ceil(yMin); gy <= yMax; gy++) {
-        svg.appendChild(svgEl('line', { x1: pad, y1: sy(gy), x2: W - pad, y2: sy(gy), stroke: '#EAE4D8', 'stroke-width': 1 }));
+        svg.appendChild(svgEl('line', { x1: pad, y1: sy(gy), x2: W - pad, y2: sy(gy), stroke: DIAGRAM_COLORS.grid, 'stroke-width': 1 }));
       }
     }
     // axes
@@ -51,7 +51,7 @@ registerDiagram({
     svg.appendChild(arrow(x0, H - pad, x0, pad, { color: MATH_STROKE }));
     svg.appendChild(textEl(W - pad + 12, y0 + 4, spec.xLabel || 'x', { 'font-size': 12 }));
     svg.appendChild(textEl(x0, pad - 10, spec.yLabel || 'y', { 'font-size': 12 }));
-    svg.appendChild(textEl(x0 - 10, y0 + 14, '0', { 'font-size': 11, fill: '#6B6459' }));
+    svg.appendChild(textEl(x0 - 10, y0 + 14, '0', { 'font-size': 11, fill: DIAGRAM_COLORS.muted }));
 
     function colorFor(name, i) {
       const map = { accent: PALETTE[0], blue: PALETTE[1], green: PALETTE[2], purple: PALETTE[3] };
@@ -244,7 +244,7 @@ registerDiagram({
     const svg = baseSvg(W, H);
     const cx = W / 2, cy = H / 2 + 20;
     const dashAttrs = { stroke: MATH_STROKE, 'stroke-width': 1.5, 'stroke-dasharray': '4,3', fill: 'none' };
-    const solidAttrs = { stroke: MATH_STROKE, 'stroke-width': 1.8, fill: '#F5F1EA' };
+    const solidAttrs = { stroke: MATH_STROKE, 'stroke-width': 1.8, fill: DIAGRAM_COLORS.solid };
 
     function skewPt(x, y, z) {
       // oblique projection: z ยิงทแยง 30 องศาขึ้นขวา
@@ -263,7 +263,7 @@ registerDiagram({
       svg.appendChild(svgEl('polygon', { points: front.map((p) => p.join(',')).join(' '), ...solidAttrs }));
       // top face
       const top = [front[3], front[2], back[2], back[3]];
-      svg.appendChild(svgEl('polygon', { points: top.map((p) => p.join(',')).join(' '), fill: '#EDE9E0', stroke: MATH_STROKE, 'stroke-width': 1.8 }));
+      svg.appendChild(svgEl('polygon', { points: top.map((p) => p.join(',')).join(' '), fill: DIAGRAM_COLORS.solidAlt, stroke: MATH_STROKE, 'stroke-width': 1.8 }));
       if (labels.width) svg.appendChild(textEl((front[0][0] + front[1][0]) / 2, oy + 20, labels.width, { 'font-size': 12 }));
       if (labels.height) svg.appendChild(textEl(ox - 16, (oy + oy - h) / 2, labels.height, { 'font-size': 12, 'text-anchor': 'end' }));
       if (labels.depth) svg.appendChild(textEl((front[1][0] + back[1][0]) / 2 + 8, (front[1][1] + back[1][1]) / 2 - 6, labels.depth, { 'font-size': 12, 'text-anchor': 'start' }));
@@ -274,7 +274,7 @@ registerDiagram({
       svg.appendChild(svgEl('line', { x1: cx + r, y1: topY, x2: cx + r, y2: botY, stroke: MATH_STROKE, 'stroke-width': 1.8 }));
       svg.appendChild(svgEl('ellipse', { cx, cy: botY, rx: r, ry: r * 0.35, ...solidAttrs }));
       svg.appendChild(svgEl('path', { d: `M ${cx - r} ${topY} A ${r} ${r * 0.35} 0 0 0 ${cx + r} ${topY}`, ...dashAttrs }));
-      svg.appendChild(svgEl('path', { d: `M ${cx - r} ${topY} A ${r} ${r * 0.35} 0 0 1 ${cx + r} ${topY}`, fill: '#F5F1EA', stroke: MATH_STROKE, 'stroke-width': 1.8 }));
+      svg.appendChild(svgEl('path', { d: `M ${cx - r} ${topY} A ${r} ${r * 0.35} 0 0 1 ${cx + r} ${topY}`, fill: DIAGRAM_COLORS.solid, stroke: MATH_STROKE, 'stroke-width': 1.8 }));
       if (labels.radius) { svg.appendChild(svgEl('line', { x1: cx, y1: botY, x2: cx + r, y2: botY, stroke: MATH_ACCENT, 'stroke-width': 1.2 })); svg.appendChild(textEl(cx + r / 2, botY + 14, labels.radius, { 'font-size': 11, fill: MATH_ACCENT })); }
       if (labels.height) svg.appendChild(textEl(cx - r - 16, cy, labels.height, { 'font-size': 12, 'text-anchor': 'end' }));
     } else if (shape === 'cone') {
@@ -331,12 +331,12 @@ registerDiagram({
       svg.appendChild(svgEl('line', { x1: x(iv.from), y1: y, x2: x(iv.to), y2: y, stroke: MATH_ACCENT, 'stroke-width': 4 }));
     });
     (spec.points || []).forEach((p) => {
-      svg.appendChild(svgEl('circle', { cx: x(p.value), cy: y, r: 6, fill: p.filled === false ? '#fff' : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
+      svg.appendChild(svgEl('circle', { cx: x(p.value), cy: y, r: 6, fill: p.filled === false ? DIAGRAM_COLORS.canvas : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
       if (p.label) svg.appendChild(textEl(x(p.value), y - 14, p.label, { 'font-size': 12, fill: MATH_ACCENT }));
     });
     (spec.intervals || []).forEach((iv) => {
-      if (iv.fromOpen !== undefined) svg.appendChild(svgEl('circle', { cx: x(iv.from), cy: y, r: 6, fill: iv.fromOpen ? '#fff' : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
-      if (iv.toOpen !== undefined) svg.appendChild(svgEl('circle', { cx: x(iv.to), cy: y, r: 6, fill: iv.toOpen ? '#fff' : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
+      if (iv.fromOpen !== undefined) svg.appendChild(svgEl('circle', { cx: x(iv.from), cy: y, r: 6, fill: iv.fromOpen ? DIAGRAM_COLORS.canvas : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
+      if (iv.toOpen !== undefined) svg.appendChild(svgEl('circle', { cx: x(iv.to), cy: y, r: 6, fill: iv.toOpen ? DIAGRAM_COLORS.canvas : MATH_ACCENT, stroke: MATH_ACCENT, 'stroke-width': 2 }));
     });
     return svg;
   },
@@ -363,7 +363,7 @@ registerDiagram({
         const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
         const x2 = cx + r * Math.cos(ang + slice), y2 = cy + r * Math.sin(ang + slice);
         const large = slice > Math.PI ? 1 : 0;
-        svg.appendChild(svgEl('path', { d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`, fill: PALETTE[i % PALETTE.length], stroke: '#fff', 'stroke-width': 1.5 }));
+        svg.appendChild(svgEl('path', { d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`, fill: PALETTE[i % PALETTE.length], stroke: DIAGRAM_COLORS.separator, 'stroke-width': 1.5 }));
         const midAng = ang + slice / 2;
         svg.appendChild(svgEl('circle', { cx: W - 55, cy: 30 + i * 20, r: 6, fill: PALETTE[i % PALETTE.length] }));
         svg.appendChild(textEl(W - 42, 34 + i * 20, `${d.label} (${d.value})`, { 'font-size': 11, 'text-anchor': 'start' }));
@@ -392,7 +392,7 @@ registerDiagram({
         const y = sy(d.value);
         svg.appendChild(svgEl('rect', { x, y, width: bw, height: H - pad - y, fill: PALETTE[i % PALETTE.length] }));
         svg.appendChild(textEl(sx(i), H - pad + 16, d.label, { 'font-size': 11 }));
-        svg.appendChild(textEl(sx(i), y - 6, d.value, { 'font-size': 10, fill: '#6B6459' }));
+        svg.appendChild(textEl(sx(i), y - 6, d.value, { 'font-size': 10, fill: DIAGRAM_COLORS.muted }));
       });
     } else if (kind === 'line') {
       const pts = data.map((d, i) => `${sx(i)},${sy(d.value)}`).join(' ');
@@ -539,7 +539,7 @@ function drawFractionWhole(svg, style, total, shaded, offsetX) {
     const W = 220;
     const w = (W - 20) / total;
     for (let i = 0; i < total; i++) {
-      svg.appendChild(svgEl('rect', { x: offsetX + 10 + i * w, y: 20, width: w, height: 40, fill: i < shaded ? MATH_ACCENT : '#fff', stroke: MATH_STROKE, 'stroke-width': 1.5 }));
+      svg.appendChild(svgEl('rect', { x: offsetX + 10 + i * w, y: 20, width: w, height: 40, fill: i < shaded ? MATH_ACCENT : DIAGRAM_COLORS.canvas, stroke: MATH_STROKE, 'stroke-width': 1.5 }));
     }
   } else if (style === 'circle') {
     const W = 150, H = 190;
@@ -549,7 +549,7 @@ function drawFractionWhole(svg, style, total, shaded, offsetX) {
       const a2 = (2 * Math.PI * (i + 1)) / total - Math.PI / 2;
       const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
       const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
-      svg.appendChild(svgEl('path', { d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`, fill: i < shaded ? MATH_ACCENT : '#fff', stroke: MATH_STROKE, 'stroke-width': 1.2 }));
+      svg.appendChild(svgEl('path', { d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`, fill: i < shaded ? MATH_ACCENT : DIAGRAM_COLORS.canvas, stroke: MATH_STROKE, 'stroke-width': 1.2 }));
     }
   } else {
     const W = 150;
@@ -557,7 +557,7 @@ function drawFractionWhole(svg, style, total, shaded, offsetX) {
     const cell = (W - 20) / side;
     for (let i = 0; i < total; i++) {
       const gx = i % side, gy = Math.floor(i / side);
-      svg.appendChild(svgEl('rect', { x: offsetX + 10 + gx * cell, y: 10 + gy * cell, width: cell, height: cell, fill: i < shaded ? MATH_ACCENT : '#fff', stroke: MATH_STROKE, 'stroke-width': 1.2 }));
+      svg.appendChild(svgEl('rect', { x: offsetX + 10 + gx * cell, y: 10 + gy * cell, width: cell, height: cell, fill: i < shaded ? MATH_ACCENT : DIAGRAM_COLORS.canvas, stroke: MATH_STROKE, 'stroke-width': 1.2 }));
     }
   }
 }

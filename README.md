@@ -58,6 +58,8 @@ AI แทรกรูปประกอบเข้าไปในเนื้�
 |---|---|
 | `index.html` | โครงหน้าเว็บทั้งหมด |
 | `styles.css` | ธีม/ดีไซน์ |
+| `motion.css` | motion tokens, entry/overlay/slide transitions และ reduced-motion fallback |
+| `motion.js` | ตัวประสาน animation ระหว่างหน้าแชต, modal, preview และสไลด์ |
 | `storage.js` | จัดการ localStorage (settings + ประวัติงาน) |
 | `api.js` | เรียก OpenRouter API (streaming) + system prompts |
 | `fileparse.js` | ดึงข้อความจากไฟล์ .pdf / .docx / .txt ที่ครูอัปโหลด |

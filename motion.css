@@ -1,0 +1,188 @@
+/* Shared motion language for the Aero learning desk. Keep motion purposeful and cheap. */
+:root {
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 360ms;
+  --motion-stagger: 55ms;
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --motion-ease-standard: cubic-bezier(.2, .75, .3, 1);
+}
+
+button,
+.session-item,
+.exercise-card,
+.welcome-feature,
+.theme-toggle-track span,
+.theme-toggle-icon {
+  transition: transform var(--motion-fast) var(--motion-ease),
+    filter var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background-color var(--motion-base) ease,
+    border-color var(--motion-base) ease;
+}
+
+button:focus-visible,
+.session-item:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(49, 183, 225, .58);
+  outline-offset: 2px;
+}
+
+/* Entry classes are removed by MotionUI after the animation completes. */
+.motion-enter {
+  animation: motion-rise-in var(--motion-base) var(--motion-ease) both;
+}
+.motion-enter-soft {
+  animation: motion-soft-in var(--motion-slow) var(--motion-ease) both;
+}
+.motion-stagger > .motion-enter {
+  animation-delay: calc(var(--motion-index, 0) * var(--motion-stagger));
+}
+
+@keyframes motion-rise-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes motion-soft-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+#welcome-screen.motion-view-enter,
+#chat-view.motion-view-enter {
+  animation: motion-view-in var(--motion-slow) var(--motion-ease) both;
+}
+@keyframes motion-view-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Keep overlays in the DOM so their exit can fade before becoming hidden. */
+.modal-overlay.motion-layer,
+.print-overlay.motion-layer,
+.slide-overlay.motion-layer {
+  animation: motion-overlay-in var(--motion-base) var(--motion-ease) both;
+}
+.modal-overlay.motion-layer.motion-layer-closing,
+.print-overlay.motion-layer.motion-layer-closing,
+.slide-overlay.motion-layer.motion-layer-closing {
+  animation: motion-overlay-out var(--motion-fast) ease both;
+  pointer-events: none;
+}
+.modal-overlay.motion-layer .modal,
+.print-overlay.motion-layer #print-page,
+.slide-overlay.motion-layer #slide-viewport {
+  animation: motion-panel-in var(--motion-base) var(--motion-ease) both;
+}
+.modal-overlay.motion-layer.motion-layer-closing .modal,
+.print-overlay.motion-layer.motion-layer-closing #print-page,
+.slide-overlay.motion-layer.motion-layer-closing #slide-viewport {
+  animation: motion-panel-out var(--motion-fast) ease both;
+}
+@keyframes motion-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes motion-panel-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes motion-panel-out {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 8px, 0) scale(.99); }
+}
+
+.reasoning-block,
+.streaming {
+  transition: opacity var(--motion-base) ease, background-color var(--motion-base) ease;
+}
+.streaming::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent, #168fc4);
+  animation: motion-caret 900ms steps(1, end) infinite;
+}
+@keyframes motion-caret { 0%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
+
+.exercise-context.motion-enter-soft,
+.exercise-card.motion-enter {
+  --motion-index: 0;
+}
+.exercise-card.motion-enter:nth-child(2) { --motion-index: 1; }
+.exercise-card.motion-enter:nth-child(3) { --motion-index: 2; }
+.exercise-card.motion-enter:nth-child(4) { --motion-index: 3; }
+.exercise-card.motion-enter:nth-child(5) { --motion-index: 4; }
+
+.slide-page {
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(3%, 0, 0);
+  transition: opacity var(--motion-base) var(--motion-ease),
+    transform var(--motion-base) var(--motion-ease), visibility 0s linear var(--motion-base);
+}
+.slide-page.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(0, 0, 0);
+  transition-delay: 0s;
+}
+.slide-page.is-before { transform: translate3d(-3%, 0, 0); }
+.slide-page.is-after { transform: translate3d(3%, 0, 0); }
+.slide-pdf-page,
+.slide-pdf-page.active {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  transform: none !important;
+  transition: none !important;
+}
+
+html.motion-theme-transition,
+html.motion-theme-transition * {
+  transition-property: background-color, color, border-color, box-shadow, filter !important;
+  transition-duration: var(--motion-slow) !important;
+  transition-timing-function: var(--motion-standard, ease) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .welcome-feature:hover,
+  .exercise-card:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+  .motion-enter,
+  .motion-enter-soft,
+  #welcome-screen.motion-view-enter,
+  #chat-view.motion-view-enter,
+  .slide-page,
+  .slide-page.active,
+  .slide-page.is-before,
+  .slide-page.is-after {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+  }
+  .streaming::after { animation: none !important; opacity: 1; }
+}
+
+@media print {
+  .motion-enter,
+  .motion-enter-soft,
+  .motion-view-enter,
+  .slide-page,
+  .slide-page.active {
+    animation: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

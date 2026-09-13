@@ -1,0 +1,272 @@
+html[data-theme="night"] body{background:#06192d;color:#e8faff}
+html[data-theme="night"] .aero-scene{background:linear-gradient(180deg,rgba(3,25,77,.78),rgba(10,74,128,.42) 46%,rgba(3,52,41,.82)),url('assets/aero-hills.jpg') center 53%/cover no-repeat}
+html[data-theme="night"] .aero-scene:before{background:linear-gradient(180deg,rgba(14,71,156,.34),transparent 42%,rgba(0,55,43,.5));mix-blend-mode:normal}
+html[data-theme="night"] .aero-sun{background:radial-gradient(circle,rgba(193,240,255,.65) 0 7%,rgba(79,171,232,.28) 32%,transparent 70%)}
+html[data-theme="night"] .aero-glint{opacity:.28}
+html[data-theme="night"] #sidebar{color:#e5f9ff;background:linear-gradient(145deg,rgba(8,54,91,.9),rgba(7,92,121,.75));border-color:rgba(124,226,250,.55);box-shadow:0 18px 42px rgba(0,10,31,.48),inset 0 1px 0 rgba(220,253,255,.65)}
+html[data-theme="night"] .sidebar-header{border-bottom-color:rgba(126,224,247,.24)}
+html[data-theme="night"] .sidebar-header p,html[data-theme="night"] .sidebar-window-label,html[data-theme="night"] .sidebar-section-title,html[data-theme="night"] .sidebar-section-title span,html[data-theme="night"] .mode-btn small{color:#9bd8ea}
+html[data-theme="night"] .mode-btn{color:#e6fbff;background:linear-gradient(180deg,rgba(29,117,157,.9),rgba(8,61,104,.9));border-color:rgba(159,239,255,.5);box-shadow:inset 0 2px 0 rgba(232,255,255,.55),inset 0 -5px 10px rgba(0,17,49,.3),0 5px 11px rgba(0,12,37,.35)}
+html[data-theme="night"] .mode-btn:hover{filter:brightness(1.14);box-shadow:inset 0 2px 0 rgba(232,255,255,.65),0 8px 15px rgba(0,12,37,.45)}
+html[data-theme="night"] .mode-chevron{color:#a9f1ff}
+html[data-theme="night"] #session-list{border-color:rgba(150,235,250,.35);background:rgba(0,29,59,.32);box-shadow:inset 0 2px 8px rgba(0,10,36,.34)}
+html[data-theme="night"] .session-item{color:#dff8ff}html[data-theme="night"] .session-item:hover{background:rgba(82,185,218,.26);border-color:rgba(156,237,251,.32)}html[data-theme="night"] .session-item.active{background:linear-gradient(180deg,rgba(39,142,181,.75),rgba(8,73,116,.76));border-color:rgba(168,240,255,.55);box-shadow:inset 0 1px 0 rgba(230,255,255,.5),0 3px 8px rgba(0,10,36,.3)}html[data-theme="night"] .session-delete{color:#9bd8ea}
+html[data-theme="night"] .settings-btn{color:#e5faff;background:linear-gradient(180deg,rgba(32,128,165,.58),rgba(7,63,102,.5));border-color:rgba(155,235,250,.38)}html[data-theme="night"] .settings-btn:hover{background:rgba(81,184,213,.38)}
+html[data-theme="night"] #main-panel{background:rgba(3,35,65,.38);border-color:rgba(154,236,253,.5);box-shadow:0 18px 42px rgba(0,10,31,.48),inset 0 1px 0 rgba(220,253,255,.55)}
+html[data-theme="night"] #welcome-screen h2,html[data-theme="night"] #welcome-screen p{color:#e8fbff;text-shadow:0 2px 5px rgba(0,5,31,.6)}html[data-theme="night"] #welcome-screen:before{color:#9de9fb}html[data-theme="night"] .welcome-panel{background:linear-gradient(145deg,rgba(12,98,139,.62),rgba(5,40,76,.7));border-color:rgba(160,240,255,.52);box-shadow:inset 0 2px 0 rgba(224,255,255,.56),0 18px 42px rgba(0,8,30,.42)}
+html[data-theme="night"] #chat-header{background:linear-gradient(180deg,rgba(20,125,179,.97),rgba(3,49,105,.97));border-bottom-color:rgba(159,239,255,.5)}
+html[data-theme="night"] #chat-messages{background:rgba(1,19,43,.16)}html[data-theme="night"] .msg-bubble{color:#def7ff;background:linear-gradient(145deg,rgba(10,81,117,.88),rgba(3,43,81,.9));border-color:rgba(155,235,255,.48);box-shadow:inset 0 2px 0 rgba(219,255,255,.42),0 6px 15px rgba(0,6,28,.4)}html[data-theme="night"] .msg.user .msg-bubble{color:#e8fcff;background:linear-gradient(145deg,rgba(7,126,160,.88),rgba(3,72,117,.9))}html[data-theme="night"] .reasoning-block{color:#a9ddec;background:rgba(0,29,60,.35);border-left-color:#64d9ef}html[data-theme="night"] .attach-tag,html[data-theme="night"] .confirm-hint{color:#9bd5e6}
+html[data-theme="night"] .markdown-body h1,html[data-theme="night"] .markdown-body h2,html[data-theme="night"] .markdown-body h3{color:#9aeaff}html[data-theme="night"] .markdown-body code{color:#c8f7ff;background:rgba(59,173,203,.22);border-color:rgba(157,237,251,.28)}html[data-theme="night"] .markdown-body pre{background:rgba(0,16,43,.38);border-color:rgba(154,236,253,.35)}
+html[data-theme="night"] .exercise-card{background:linear-gradient(145deg,rgba(12,82,111,.86),rgba(3,42,77,.9));border-color:rgba(157,237,251,.48);box-shadow:inset 0 2px 0 rgba(221,255,255,.42),0 7px 14px rgba(0,8,30,.4)}html[data-theme="night"] .exercise-card-body{color:#def7ff}
+html[data-theme="night"] #chat-input-area{background:linear-gradient(180deg,rgba(4,63,91,.48),rgba(1,28,59,.66));border-top-color:rgba(153,234,252,.42)}html[data-theme="night"] #chat-form{background:linear-gradient(180deg,rgba(13,105,139,.84),rgba(3,51,92,.9));border-color:rgba(164,241,255,.55);box-shadow:inset 0 2px 0 rgba(224,255,255,.48),0 6px 13px rgba(0,8,30,.4)}html[data-theme="night"] #chat-input{color:#e9fcff}html[data-theme="night"] #chat-input::placeholder{color:#a6d6e4}html[data-theme="night"] #attach-btn{color:#d7faff;background:linear-gradient(180deg,#238bae,#07527e);border-color:rgba(171,243,255,.56)}html[data-theme="night"] #attach-chip{color:#c8eff8;background:rgba(4,44,75,.72);border-color:rgba(164,239,255,.42)}
+html[data-theme="night"] .theme-toggle{color:#e5fbff;background:linear-gradient(180deg,rgba(32,128,165,.7),rgba(7,63,102,.62));border-color:rgba(155,235,250,.42)}html[data-theme="night"] .theme-toggle small{color:#9bd8ea}html[data-theme="night"] .theme-toggle-track{background:#06304f;border-color:rgba(172,244,255,.6)}html[data-theme="night"] .theme-toggle-track span{transform:translateX(16px);background:#ffe982}
+html[data-theme="night"] .modal-overlay{background:rgba(0,11,29,.68)}html[data-theme="night"] .modal{color:#def7ff;background:linear-gradient(145deg,rgba(7,62,93,.97),rgba(2,27,58,.98));border-color:rgba(161,239,255,.62);box-shadow:0 24px 60px rgba(0,5,20,.65),inset 0 2px 0 rgba(222,255,255,.48)}html[data-theme="night"] .modal h2,html[data-theme="night"] .modal label{color:#d9f8ff}html[data-theme="night"] .modal input,html[data-theme="night"] .modal select{color:#e5fbff;background:rgba(2,31,59,.72);border-color:rgba(151,231,250,.48)}html[data-theme="night"] .modal-hint{color:#a5d8e6}html[data-theme="night"] .model-chip{color:#ddf9ff;background:linear-gradient(180deg,#1b7193,#073b69);border-color:rgba(155,235,251,.45)}
+html[data-theme="night"] .print-overlay{background:linear-gradient(180deg,#031c4d,#075f8c 45%,#0a4728)}html[data-theme="night"] .slide-overlay{background:linear-gradient(180deg,#020b28,#064b70 55%,#0a3c25)}
+
+/* Generated content uses role-specific surfaces.  The day selector
+   `.msg.assistant .msg-bubble` has greater specificity than a generic
+   night `.msg-bubble`, so keep the role in this override. */
+html[data-theme="night"] {
+  color-scheme: dark;
+  --night-content: #e2f7ff;
+  --night-content-strong: #f5fdff;
+  --night-heading: #d9f8ff;
+  --night-muted: #a7dcea;
+  --night-link: #8de7ff;
+}
+
+html[data-theme="night"] .msg.assistant .msg-bubble {
+  color: var(--night-content);
+  background: linear-gradient(145deg, rgba(10, 81, 117, .97), rgba(3, 43, 81, .98));
+  border-color: rgba(155, 235, 255, .56);
+  box-shadow: inset 0 2px 0 rgba(219, 255, 255, .42), 0 6px 15px rgba(0, 6, 28, .4);
+}
+
+html[data-theme="night"] .markdown-body,
+html[data-theme="night"] .exercise-card-body {
+  color: var(--night-content);
+}
+html[data-theme="night"] .markdown-body h1,
+html[data-theme="night"] .markdown-body h2,
+html[data-theme="night"] .markdown-body h3 {
+  color: var(--night-heading);
+  text-shadow: 0 1px 2px rgba(0, 12, 34, .72);
+}
+html[data-theme="night"] .markdown-body p,
+html[data-theme="night"] .markdown-body li,
+html[data-theme="night"] .markdown-body dt,
+html[data-theme="night"] .markdown-body dd,
+html[data-theme="night"] .markdown-body td {
+  color: var(--night-content);
+}
+html[data-theme="night"] .markdown-body strong,
+html[data-theme="night"] .markdown-body th { color: var(--night-content-strong); }
+html[data-theme="night"] .markdown-body a {
+  color: var(--night-link);
+  text-decoration-color: rgba(141, 231, 255, .7);
+}
+html[data-theme="night"] .markdown-body code {
+  color: #d8faff;
+  background: rgba(29, 130, 164, .34);
+  border-color: rgba(157, 237, 251, .4);
+}
+html[data-theme="night"] .markdown-body pre {
+  color: #dff8ff;
+  background: rgba(0, 16, 43, .58);
+  border-color: rgba(154, 236, 253, .42);
+}
+html[data-theme="night"] .markdown-body blockquote {
+  color: var(--night-content);
+  border-inline-start: 3px solid #64d9ef;
+  background: rgba(0, 29, 60, .38);
+}
+html[data-theme="night"] .markdown-body table {
+  border-color: rgba(157, 237, 251, .42);
+}
+html[data-theme="night"] .markdown-body th,
+html[data-theme="night"] .markdown-body td {
+  border-color: rgba(157, 237, 251, .3);
+}
+html[data-theme="night"] .markdown-body th { background: rgba(29, 130, 164, .3); }
+html[data-theme="night"] .markdown-body hr { border-color: rgba(157, 237, 251, .36); }
+html[data-theme="night"] .markdown-body .katex,
+html[data-theme="night"] .markdown-body .katex * { color: #e8fbff; }
+
+/* Midnight Blueprint for generated SVG diagrams.  Renderer attributes use
+   these inherited custom properties, so existing diagrams respond live to a
+   theme change without being rebuilt. */
+html[data-theme="night"] figure.diagram:not(.diagram-fallback) {
+  color: #bfefff;
+  --diagram-ink: #bfefff;
+  --diagram-muted: #8ecfe3;
+  --diagram-guide: #3a6377;
+  --diagram-grid: #285269;
+  --diagram-canvas: #0b2133;
+  --diagram-shape: #103b52;
+  --diagram-solid: #16485f;
+  --diagram-solid-alt: #1b5067;
+  --diagram-solid-warm: #17465c;
+  --diagram-warm-fill: #3b2b32;
+  --diagram-table: #264c5a;
+  --diagram-optic-fill: #123a54;
+  --diagram-ray: #70a9be;
+  --diagram-on-accent: #f4fbff;
+  --diagram-separator: #0b2133;
+  --diagram-accent: #ff6b57;
+  --diagram-force: #ff6b57;
+  --diagram-secondary: #62b5ee;
+  --diagram-positive: #78c775;
+  --diagram-series-1: #ff6b57;
+  --diagram-series-2: #62b5ee;
+  --diagram-series-3: #78c775;
+  --diagram-series-4: #c38ff3;
+  --diagram-series-5: #e8b95f;
+  --diagram-series-6: #f58a7a;
+  background-color: #0b2133;
+  background-image:
+    linear-gradient(rgba(55, 151, 187, .09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55, 151, 187, .09) 1px, transparent 1px);
+  background-position: -1px -1px;
+  background-size: 36px 36px;
+  border-color: rgba(30, 169, 214, .78);
+  box-shadow: inset 0 1px 0 rgba(126, 220, 245, .14), 0 5px 12px rgba(0, 8, 30, .4);
+}
+html[data-theme="night"] figure.diagram:not(.diagram-fallback) figcaption,
+html[data-theme="night"] figure.diagram:not(.diagram-fallback) .diagram-edit-btn {
+  color: #8ecfe3;
+}
+html[data-theme="night"] figure.diagram:not(.diagram-fallback) .diagram-edit-btn {
+  border-color: rgba(58, 187, 226, .55);
+  background: #0d3146;
+}
+html[data-theme="night"] figure.diagram:not(.diagram-fallback) .diagram-edit-btn:hover {
+  color: #f4fbff;
+  background: #123d53;
+}
+
+/* SmilesDrawer has distinct light/dark artwork; keep both layers so an
+   already-rendered molecule follows the theme toggle with no async redraw. */
+.molecule-layer-dark { display: none; }
+html[data-theme="night"] .molecule-layer-light { display: none; }
+html[data-theme="night"] .molecule-layer-dark { display: block; }
+
+/* Mermaid emits inline theme styles, so scope these stronger overrides to its
+   SVG only.  Native renderer SVGs continue using the semantic palette above. */
+html[data-theme="night"] .diagram-mermaid svg { background: transparent !important; }
+html[data-theme="night"] .diagram-mermaid .node rect,
+html[data-theme="night"] .diagram-mermaid .node circle,
+html[data-theme="night"] .diagram-mermaid .node ellipse,
+html[data-theme="night"] .diagram-mermaid .node polygon,
+html[data-theme="night"] .diagram-mermaid .node path {
+  fill: #103b52 !important;
+  stroke: #7ccee8 !important;
+}
+html[data-theme="night"] .diagram-mermaid .nodeLabel,
+html[data-theme="night"] .diagram-mermaid .label text,
+html[data-theme="night"] .diagram-mermaid .edgeLabel text {
+  color: #bfefff !important;
+  fill: #bfefff !important;
+}
+html[data-theme="night"] .diagram-mermaid .flowchart-link,
+html[data-theme="night"] .diagram-mermaid .edgePath .path {
+  stroke: #8ecfe3 !important;
+}
+html[data-theme="night"] .diagram-mermaid marker path {
+  fill: #8ecfe3 !important;
+  stroke: #8ecfe3 !important;
+}
+html[data-theme="night"] .diagram-mermaid .edgeLabel rect,
+html[data-theme="night"] .diagram-mermaid .labelBkg {
+  fill: #0b2133 !important;
+  opacity: .96 !important;
+}
+
+/* html2pdf captures screen media, not @media print. */
+html[data-theme="night"] #print-page.exporting-pdf {
+  color: #163f59;
+  background: #fff;
+  border-color: transparent;
+  box-shadow: none;
+}
+html[data-theme="night"] #print-page.exporting-pdf #print-title,
+html[data-theme="night"] #print-page.exporting-pdf #print-body h1,
+html[data-theme="night"] #print-page.exporting-pdf #print-body h2,
+html[data-theme="night"] #print-page.exporting-pdf #print-body h3 { color: #12688b; text-shadow: none; }
+html[data-theme="night"] #print-page.exporting-pdf #print-body,
+html[data-theme="night"] #print-page.exporting-pdf #print-body p,
+html[data-theme="night"] #print-page.exporting-pdf #print-body li,
+html[data-theme="night"] #print-page.exporting-pdf #print-body td,
+html[data-theme="night"] #print-page.exporting-pdf #print-body .katex,
+html[data-theme="night"] #print-page.exporting-pdf #print-body .katex * { color: #163f59; }
+
+/* Export and browser printing stay paper-friendly even if the app itself is
+   in Night Aero.  Reset both the card and inherited SVG palette explicitly. */
+html[data-theme="night"] #print-page.exporting-pdf figure.diagram:not(.diagram-fallback) {
+  --diagram-ink: #2d2a26;
+  --diagram-muted: #6b6459;
+  --diagram-guide: #c9c2b4;
+  --diagram-grid: #eae4d8;
+  --diagram-canvas: #ffffff;
+  --diagram-shape: #ffffff;
+  --diagram-solid: #f5f1ea;
+  --diagram-solid-alt: #ede9e0;
+  --diagram-solid-warm: #f0ebe1;
+  --diagram-warm-fill: #fff3ec;
+  --diagram-table: #d9cbb8;
+  --diagram-optic-fill: #eaf2f8;
+  --diagram-ray: #8aa0b8;
+  --diagram-on-accent: #ffffff;
+  --diagram-separator: #ffffff;
+  --diagram-accent: #d97757;
+  --diagram-force: #b3432b;
+  --diagram-secondary: #3b6ea5;
+  --diagram-positive: #5b8c3e;
+  --diagram-series-1: #d97757;
+  --diagram-series-2: #3b6ea5;
+  --diagram-series-3: #5b8c3e;
+  --diagram-series-4: #9b6bc7;
+  --diagram-series-5: #c79b3b;
+  --diagram-series-6: #b3432b;
+  color: #163f59;
+  background: linear-gradient(145deg, rgba(255,255,255,.8), rgba(178,236,247,.42));
+  border-color: rgba(255,255,255,.9);
+  box-shadow: inset 0 2px 0 #fff, 0 4px 10px rgba(0,96,129,.12);
+}
+html[data-theme="night"] #print-page.exporting-pdf .molecule-layer-light { display: block; }
+html[data-theme="night"] #print-page.exporting-pdf .molecule-layer-dark { display: none; }
+
+@media print {
+  html[data-theme="night"] #print-page figure.diagram:not(.diagram-fallback) {
+    --diagram-ink: #2d2a26;
+    --diagram-muted: #6b6459;
+    --diagram-guide: #c9c2b4;
+    --diagram-grid: #eae4d8;
+    --diagram-canvas: #ffffff;
+    --diagram-shape: #ffffff;
+    --diagram-solid: #f5f1ea;
+    --diagram-solid-alt: #ede9e0;
+    --diagram-solid-warm: #f0ebe1;
+    --diagram-warm-fill: #fff3ec;
+    --diagram-table: #d9cbb8;
+    --diagram-optic-fill: #eaf2f8;
+    --diagram-ray: #8aa0b8;
+    --diagram-on-accent: #ffffff;
+    --diagram-separator: #ffffff;
+    --diagram-accent: #d97757;
+    --diagram-force: #b3432b;
+    --diagram-secondary: #3b6ea5;
+    --diagram-positive: #5b8c3e;
+    --diagram-series-1: #d97757;
+    --diagram-series-2: #3b6ea5;
+    --diagram-series-3: #5b8c3e;
+    --diagram-series-4: #9b6bc7;
+    --diagram-series-5: #c79b3b;
+    --diagram-series-6: #b3432b;
+    color: #163f59;
+    background: linear-gradient(145deg, rgba(255,255,255,.8), rgba(178,236,247,.42));
+    border-color: rgba(255,255,255,.9);
+    box-shadow: inset 0 2px 0 #fff, 0 4px 10px rgba(0,96,129,.12);
+  }
+  html[data-theme="night"] #print-page .molecule-layer-light { display: block; }
+  html[data-theme="night"] #print-page .molecule-layer-dark { display: none; }
+}
