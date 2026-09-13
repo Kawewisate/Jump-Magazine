@@ -88,3 +88,31 @@ test('motion coordinator respects reduced motion and still resolves UI state', a
   assert.equal(classes.has('hidden'), true);
   assert.equal(typeof listeners.animationend, 'function');
 });
+
+test('PWA manifest defines a relative standalone install', () => {
+  const manifest = JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(manifest.name, 'ผู้ช่วยครู AI');
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.scope, './');
+  assert.equal(manifest.theme_color, '#0d82c4');
+  assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192' && icon.type === 'image/png'));
+  assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.type === 'image/png'));
+  for (const icon of manifest.icons) assert.ok(fs.existsSync(new URL(icon.src, root)));
+});
+
+test('index links PWA metadata and registration without an app-owned install UI', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+  assert.match(html, /apple-touch-icon/);
+  assert.match(html, /<script src="pwa\.js"><\/script>/);
+  assert.doesNotMatch(html, /beforeinstallprompt|Install app|ติดตั้งเป็นแอป/i);
+});
+
+test('service worker keeps API traffic network-only and supports navigation fallback', () => {
+  const worker = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+  assert.match(worker, /request\.method !== 'GET'/);
+  assert.match(worker, /openrouter\.ai/);
+  assert.match(worker, /request\.mode === 'navigate'/);
+  assert.match(worker, /caches\.match\('\.\/index\.html'\)/);
+});
