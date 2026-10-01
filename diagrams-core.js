@@ -57,7 +57,11 @@ function loadJson5() {
   if (window.JSON5) return Promise.resolve(window.JSON5);
   if (!json5Promise) {
     json5Promise = loadScriptOnce('https://cdn.jsdelivr.net/npm/json5@2.2.3/dist/index.min.js').then(
-      () => window.JSON5
+      () => window.JSON5,
+      (err) => {
+        json5Promise = null; // โหลดพลาดครั้งเดียวไม่ควรทำให้ลองใหม่ไม่ได้อีก
+        throw err;
+      }
     );
   }
   return json5Promise;
@@ -70,7 +74,11 @@ function loadScriptOnce(url) {
     const s = document.createElement('script');
     s.src = url;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error('โหลดไลบรารีไม่สำเร็จ: ' + url));
+    s.onerror = () => {
+      delete scriptPromises[url]; // ให้เรียกซ้ำแล้วลองโหลดใหม่ได้ (เช่น เน็ตหลุดชั่วคราว)
+      s.remove();
+      reject(new Error('โหลดไลบรารีไม่สำเร็จ: ' + url));
+    };
     document.head.appendChild(s);
   });
   return scriptPromises[url];

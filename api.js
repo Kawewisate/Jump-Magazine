@@ -2,6 +2,9 @@
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+// ถ้าไม่ได้รับข้อมูลใดๆ (รวม keep-alive) นานเกินนี้ ถือว่าเน็ตค้าง — ไม่งั้น isBusy จะค้างจนต้องรีโหลดหน้า
+let STREAM_IDLE_TIMEOUT_MS = 120000;
+
 const CONFIRM_TRIGGER_MESSAGE =
   'ครูยืนยันแผนแล้ว กรุณาสร้างเนื้อหาการสอนฉบับเต็มตามแผนที่ตกลงกัน';
 
@@ -113,9 +116,21 @@ async function callOpenRouterStream(messages, callbacks) {
   let finishReason = null;
   let terminalCallbackSent = false;
   let reader = null;
+  const controller = new AbortController();
+  let idleTimer = null;
+  let timedOut = false;
+  const resetIdleTimer = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, STREAM_IDLE_TIMEOUT_MS);
+  };
   try {
+    resetIdleTimer();
     const resp = await fetch(OPENROUTER_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${settings.apiKey}`,
         'Content-Type': 'application/json',
@@ -174,6 +189,7 @@ async function callOpenRouterStream(messages, callbacks) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      resetIdleTimer();
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
@@ -192,10 +208,15 @@ async function callOpenRouterStream(messages, callbacks) {
       throw new Error('โมเดลไม่ส่งคำตอบกลับมา ลองใหม่อีกครั้ง หรือเปลี่ยนโมเดลในหน้าตั้งค่า');
     }
   } catch (err) {
+    clearTimeout(idleTimer);
     try { await reader?.cancel(); } catch {}
-    safeCallback(onError, err);
+    safeCallback(
+      onError,
+      timedOut ? new Error('การเชื่อมต่อค้าง ไม่ได้รับข้อมูลจากโมเดลนานเกินไป ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง') : err
+    );
     return;
   }
+  clearTimeout(idleTimer);
 
   if (!terminalCallbackSent) {
     terminalCallbackSent = true;

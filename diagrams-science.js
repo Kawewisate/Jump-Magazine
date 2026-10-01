@@ -495,7 +495,10 @@ let smilesReady = null;
 function ensureSmilesDrawer() {
   if (window.SmilesDrawer) return Promise.resolve();
   if (!smilesReady) {
-    smilesReady = loadScriptOnce('https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/dist/smiles-drawer.min.js');
+    smilesReady = loadScriptOnce('https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/dist/smiles-drawer.min.js').catch((err) => {
+      smilesReady = null;
+      throw err;
+    });
   }
   return smilesReady;
 }

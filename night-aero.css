@@ -1,5 +1,5 @@
 html[data-theme="night"] body{background:#06192d;color:#e8faff}
-html[data-theme="night"] .aero-scene{background:linear-gradient(180deg,rgba(3,25,77,.78),rgba(10,74,128,.42) 46%,rgba(3,52,41,.82)),url('assets/aero-hills.jpg') center 53%/cover no-repeat}
+html[data-theme="night"] .aero-scene{background:linear-gradient(180deg,rgba(3,25,77,.78),rgba(10,74,128,.42) 46%,rgba(3,52,41,.82)),url('assets/vintage/aero-lake-mirror-public-domain.jpg') center 53%/cover no-repeat}
 html[data-theme="night"] .aero-scene:before{background:linear-gradient(180deg,rgba(14,71,156,.34),transparent 42%,rgba(0,55,43,.5));mix-blend-mode:normal}
 html[data-theme="night"] .aero-sun{background:radial-gradient(circle,rgba(193,240,255,.65) 0 7%,rgba(79,171,232,.28) 32%,transparent 70%)}
 html[data-theme="night"] .aero-glint{opacity:.28}

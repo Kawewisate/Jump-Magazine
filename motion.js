@@ -44,7 +44,7 @@
     if (!layer || layer.classList.contains('hidden')) return;
     layer.classList.add('motion-layer', 'motion-layer-closing');
     layer.addEventListener('animationend', (event) => {
-      if (event.target !== layer) return;
+      if (event.target !== layer || !layer.classList.contains('motion-layer-closing')) return; // เปิดซ้ำระหว่างปิด: ห้ามซ่อน
       layer.classList.add('hidden');
       layer.classList.remove('motion-layer', 'motion-layer-closing');
     }, { once: true });

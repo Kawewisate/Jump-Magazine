@@ -13,8 +13,25 @@ const DEFAULT_SETTINGS = {
 };
 
 const storageCache = new Map();
+let sessionSummaryMemo = null; // { raw, list } — สรุปรายการงานสำหรับ sidebar โดยไม่ต้อง parse ทั้งก้อนซ้ำ
 let storageMemoryOnly = false;
 let storageNoticeSent = false;
+
+// แท็บ/หน้าต่าง PWA อื่นเขียน localStorage → ทิ้ง cache ของ key นั้น ไม่งั้นบันทึกครั้งถัดไปจะเขียนทับงานของอีกแท็บ
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('storage', (event) => {
+    if (event.key === null) storageCache.clear();
+    else storageCache.delete(event.key);
+    if (event.key === null || event.key === STORAGE_KEYS.SESSIONS) {
+      sessionSummaryMemo = null;
+      try {
+        window.dispatchEvent(new Event('teacherai-sessions-changed'));
+      } catch {
+        // ไม่มี Event ใน context ที่จำกัด (เช่น เทสต์)
+      }
+    }
+  });
+}
 
 function markStorageUnavailable() {
   storageMemoryOnly = true;
@@ -122,6 +139,24 @@ function getSessions() {
   }
 }
 
+function summarizeSessions(sessions) {
+  return sessions.map((s) => ({ id: s.id, mode: s.mode, title: s.title }));
+}
+
+// รายการงานแบบย่อ (id/mode/title) สำหรับวาด sidebar — memo ตาม raw string จึงไม่ parse ซ้ำถ้าข้อมูลไม่เปลี่ยน
+function getSessionSummaries() {
+  try {
+    const raw = readStorage(STORAGE_KEYS.SESSIONS);
+    if (!raw) return [];
+    if (sessionSummaryMemo && sessionSummaryMemo.raw === raw) return sessionSummaryMemo.list;
+    const list = summarizeSessions(getSessions());
+    sessionSummaryMemo = { raw, list };
+    return list;
+  } catch {
+    return [];
+  }
+}
+
 let storageFullWarned = false;
 
 function saveSessions(sessions) {
@@ -129,6 +164,7 @@ function saveSessions(sessions) {
     // ไม่เก็บ reasoning (ความคิดของโมเดล) ลง storage — ยาวมากและกินพื้นที่ localStorage (~5MB) เร็ว
     const json = JSON.stringify(sessions, (key, value) => (key === 'reasoning' ? undefined : value));
     writeStorage(STORAGE_KEYS.SESSIONS, json);
+    sessionSummaryMemo = { raw: json, list: summarizeSessions(sessions) };
     storageFullWarned = false;
   } catch (err) {
     console.error(err);

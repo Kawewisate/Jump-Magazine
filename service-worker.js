@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teacher-ai-shell-v1';
+const CACHE_NAME = 'teacher-ai-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -58,17 +58,36 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
+    // โค้ด/สไตล์ของแอป: ขอจากเครือข่ายก่อนเพื่อให้ได้เวอร์ชันล่าสุดเสมอ ตกมาใช้ cache เฉพาะตอนออฟไลน์
+    // (ถ้า cache-first ผู้ใช้จะติด app.js เก่าตลอดและปนกับ index.html ใหม่)
+    if (/\.(?:js|css|html|webmanifest)$/.test(url.pathname)) {
+      event.respondWith(fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+        }
+        return response;
+      }).catch(() => caches.match(request)));
+      return;
+    }
+    // รูป/ไอคอน ไม่ค่อยเปลี่ยน: cache-first
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+      if (response.ok) {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+      }
       return response;
     })));
     return;
   }
 
-  // CDN dependencies are optional runtime assets: cache successful responses,
-  // but never let a failed third-party request break navigation or SW install.
-  event.respondWith(fetch(request).then((response) => {
-    if (response.ok || response.type === 'opaque') caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+  // CDN dependencies are optional runtime assets (URLs are version-pinned, so cache-first is safe and fast):
+  // cache successful responses, but never let a failed third-party request break navigation or SW install.
+  event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+    if (response.ok || response.type === 'opaque') {
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+    }
     return response;
-  }).catch(() => caches.match(request)));
+  })));
 });

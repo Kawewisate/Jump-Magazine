@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const root = new URL('..', import.meta.url);
 
 function load(file, extras = {}) {
-  const context = { console, TextDecoder, TextEncoder, ...extras };
+  const context = { console, TextDecoder, TextEncoder, setTimeout, clearTimeout, AbortController, ...extras };
   context.window = context;
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(new URL(file, root), 'utf8'), context, { filename: file });
@@ -115,4 +115,145 @@ test('service worker keeps API traffic network-only and supports navigation fall
   assert.match(worker, /openrouter\.ai/);
   assert.match(worker, /request\.mode === 'navigate'/);
   assert.match(worker, /caches\.match\('\.\/index\.html'\)/);
+});
+
+test('stream that goes silent is aborted by the idle timeout instead of hanging forever', async () => {
+  const context = load('api.js', {
+    location: { href: 'http://localhost/' },
+    getSettings: () => ({ apiKey: 'test', model: 'test' }),
+    fetch: (_url, { signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }),
+  });
+  vm.runInContext('STREAM_IDLE_TIMEOUT_MS = 20', context);
+  const events = [];
+  await context.callOpenRouterStream([], {
+    onDone: () => events.push('done'),
+    onError: (err) => events.push(err.message),
+  });
+  assert.equal(events.length, 1);
+  assert.match(events[0], /ค้าง/);
+});
+
+test('storage event from another tab drops the cached sessions', () => {
+  const store = { teacherAI_sessions: '[]' };
+  const listeners = {};
+  const context = load('storage.js', {
+    localStorage: { getItem: (key) => store[key] ?? null, setItem: (key, value) => { store[key] = value; } },
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+    dispatchEvent: () => true,
+    Event: class { constructor(type) { this.type = type; } },
+  });
+  assert.deepEqual(Array.from(context.getSessions()), []);
+  store.teacherAI_sessions = JSON.stringify([{ id: 'a', mode: 'lesson', title: 'จากอีกแท็บ', messages: [] }]);
+  assert.deepEqual(Array.from(context.getSessions()), [], 'cache is still stale before the event');
+  listeners.storage({ key: 'teacherAI_sessions' });
+  assert.equal(context.getSessions()[0].id, 'a');
+  assert.equal(context.getSessionSummaries()[0].title, 'จากอีกแท็บ');
+});
+
+test('session summaries follow saves without re-parsing history', () => {
+  const store = {};
+  const context = load('storage.js', {
+    localStorage: { getItem: (key) => store[key] ?? null, setItem: (key, value) => { store[key] = value; } },
+  });
+  context.upsertSession({ id: 'a', mode: 'lesson', title: 'A', messages: [] });
+  context.upsertSession({ id: 'b', mode: 'exercise', title: 'B', messages: [] });
+  assert.deepEqual(Array.from(context.getSessionSummaries(), (s) => s.id), ['b', 'a']);
+  context.deleteSession('b');
+  assert.deepEqual(Array.from(context.getSessionSummaries(), (s) => s.id), ['a']);
+});
+
+test('a CDN script that failed to load can be retried', async () => {
+  let attempts = 0;
+  const document = {
+    createElement: () => ({ remove() {} }),
+    head: {
+      appendChild: (script) => {
+        attempts++;
+        queueMicrotask(() => (attempts === 1 ? script.onerror() : script.onload()));
+      },
+    },
+  };
+  const context = load('diagrams-core.js', { document });
+  await assert.rejects(context.loadScriptOnce('https://cdn.example/lib.js'), /โหลดไลบรารีไม่สำเร็จ/);
+  await context.loadScriptOnce('https://cdn.example/lib.js');
+  assert.equal(attempts, 2);
+});
+
+function loadApp(extras = {}) {
+  const element = () => ({ addEventListener() {}, classList: { add() {}, remove() {}, toggle() {} } });
+  return load('app.js', {
+    document: { getElementById: element, querySelectorAll: () => [], addEventListener() {} },
+    ...extras,
+  });
+}
+
+test('interrupted exercise sets (including ones stuck repairing) become retryable errors', () => {
+  const context = loadApp();
+  const session = {
+    mode: 'exercise',
+    exerciseSets: {
+      1: { status: 'pending', content: '' },
+      2: { status: 'streaming', content: 'x' },
+      3: { status: 'repairing', content: 'y' },
+      4: { status: 'done', content: 'z' },
+    },
+  };
+  context.recoverInterruptedSession(session);
+  assert.deepEqual(Object.values(session.exerciseSets).map((set) => set.status), ['error', 'error', 'error', 'done']);
+});
+
+test('frame scheduler coalesces updates and can be cancelled', () => {
+  const frames = [];
+  const context = loadApp({
+    requestAnimationFrame: (fn) => frames.push(fn),
+    cancelAnimationFrame: () => { frames.length = 0; },
+  });
+  let calls = 0;
+  const scheduler = context.createFrameScheduler(() => { calls++; });
+  scheduler.schedule();
+  scheduler.schedule();
+  scheduler.schedule();
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  assert.equal(calls, 1);
+  scheduler.schedule();
+  scheduler.cancel();
+  frames.forEach((fn) => fn && fn());
+  assert.equal(calls, 1, 'cancelled frame must not fire');
+});
+
+test('re-opening a layer while it is closing is not undone by the old close animation', async () => {
+  const context = load('motion.js', {
+    document: { documentElement: { classList: { add() {}, remove() {} } } },
+    matchMedia: () => ({ matches: false }),
+  });
+  const classes = new Set();
+  const listeners = {};
+  const layer = {
+    classList: {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      contains: (name) => classes.has(name),
+    },
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+  };
+  context.MotionUI.openLayer(layer);
+  context.MotionUI.closeLayer(layer);
+  context.MotionUI.openLayer(layer);
+  listeners.animationend({ target: layer });
+  assert.equal(classes.has('hidden'), false);
+});
+
+test('stylesheets only reference asset files that exist', () => {
+  const html = fs.readFileSync(new URL('index.html', root), 'utf8');
+  const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]).filter((href) => !/^https?:/.test(href));
+  assert.ok(sheets.length > 0);
+  for (const sheet of sheets) {
+    const css = fs.readFileSync(new URL(sheet, root), 'utf8');
+    for (const [, ref] of css.matchAll(/url\(['"]?(assets\/[^'")]+)['"]?\)/g)) {
+      assert.ok(fs.existsSync(new URL(ref, root)), `${sheet} references missing ${ref}`);
+    }
+  }
 });

@@ -1,8 +1,17 @@
 // แปลงไฟล์ที่ครูอัปโหลด (.pdf / .docx / .txt) ให้เป็นข้อความล้วน — ทำงานฝั่ง client ทั้งหมด
 
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+// ไลบรารีหนัก (pdf.js, mammoth) โหลดตอนแนบไฟล์จริงเท่านั้น ไม่โหลดตอนเปิดหน้า
+async function ensurePdfjs() {
+  if (!window.pdfjsLib) {
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+
+async function ensureMammoth() {
+  if (!window.mammoth) {
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js');
+  }
 }
 
 const MAX_ATTACHED_CHARS = 15000;
@@ -13,6 +22,7 @@ function truncateForPrompt(text) {
 }
 
 async function extractPdfText(file) {
+  await ensurePdfjs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let text = '';
@@ -25,6 +35,7 @@ async function extractPdfText(file) {
 }
 
 async function extractDocxText(file) {
+  await ensureMammoth();
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   return result.value;

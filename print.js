@@ -35,9 +35,38 @@ function markdownToSafeHtml(markdownText) {
   });
 }
 
+// แคชผล render ที่เสร็จสมบูรณ์ (markdown → HTML + สูตร KaTeX + รูปประกอบ) แบบ LRU
+// renderChatView วาดทุกข้อความใหม่หมดทุกครั้งที่สลับงาน/เริ่ม-จบการเจน/แก้รูป ถ้าไม่แคชจะ parse + วาดสูตร + วาดรูปซ้ำทุกรอบ
+const RENDER_CACHE_MAX = 16;
+const renderCache = new Map(); // markdown -> DocumentFragment (ไม่มีปุ่มแก้รูป)
+let renderSeq = 0;
+
+function storeRenderCache(text, container) {
+  // รูปที่วาดไม่สำเร็จ (เช่น CDN ล่ม) ไม่แคช เพื่อให้รอบหน้าลองวาดใหม่ได้
+  if (container.querySelector('.diagram-fallback')) return;
+  const frag = document.createDocumentFragment();
+  container.childNodes.forEach((node) => frag.appendChild(node.cloneNode(true)));
+  frag.querySelectorAll('.diagram-edit-btn').forEach((btn) => btn.remove());
+  renderCache.delete(text);
+  renderCache.set(text, frag);
+  if (renderCache.size > RENDER_CACHE_MAX) renderCache.delete(renderCache.keys().next().value);
+}
+
 // renderDiagrams=false ใช้ตอน stream ข้อความสดๆ (ยังไม่อยากวาดรูปซ้ำๆ ระหว่างพิมพ์)
 function renderMarkdownWithMath(container, markdownText, { renderDiagrams = true } = {}) {
   const text = markdownText || '';
+  const seq = ++renderSeq;
+  container._renderSeq = seq;
+
+  const cached = renderDiagrams && text ? renderCache.get(text) : null;
+  if (cached) {
+    renderCache.delete(text); // ย้ายไปท้ายสุด (ใช้ล่าสุด)
+    renderCache.set(text, cached);
+    container.replaceChildren(cached.cloneNode(true));
+    container.diagramsReady = Promise.resolve();
+    return container.diagramsReady;
+  }
+
   if (window.marked && window.DOMPurify) {
     container.innerHTML = markdownToSafeHtml(text);
   } else {
@@ -53,10 +82,14 @@ function renderMarkdownWithMath(container, markdownText, { renderDiagrams = true
     });
   }
   // แล้วค่อยแปลงบล็อก ```diagram/```mermaid เป็นรูปจริง
-  if (renderDiagrams && window.renderDiagramsIn) {
-    return renderDiagramsIn(container);
-  }
-  container.diagramsReady = Promise.resolve();
+  const ready = renderDiagrams && window.renderDiagramsIn ? renderDiagramsIn(container) : Promise.resolve();
+  const cacheable = renderDiagrams && text && window.marked && window.DOMPurify;
+  container.diagramsReady = cacheable
+    ? Promise.resolve(ready).then(() => {
+        // เก็บแคชเฉพาะเมื่อ container ยังเป็นผลของรอบนี้ (ไม่ถูก render ทับระหว่างรอรูป)
+        if (container._renderSeq === seq) storeRenderCache(text, container);
+      })
+    : ready;
   return container.diagramsReady;
 }
 
@@ -78,6 +111,13 @@ function sanitizeFilename(name) {
   return (name || 'เอกสาร').replace(/[\\/:*?"<>|]+/g, '_').trim().slice(0, 80) || 'เอกสาร';
 }
 
+// html2pdf.js (~900KB) โหลดตอนกดบันทึก PDF ครั้งแรกเท่านั้น
+async function ensureHtml2pdf() {
+  if (typeof html2pdf === 'function') return;
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js');
+  if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+}
+
 // สร้างไฟล์ PDF ตรงจากเนื้อหาในพรีวิว ด้วย html2pdf.js (html2canvas + jsPDF)
 // เลือกวิธีนี้แทนการพึ่ง window.print()/Ctrl+P เพราะเบราว์เซอร์ (โดยเฉพาะ Chrome)
 // มีบั๊กเรื่องการแบ่งหน้าพิมพ์กับ element ที่ตั้ง overflow ไว้ ทำให้ได้ PDF หน้าเปล่า/ไม่ครบ
@@ -92,7 +132,7 @@ async function exportPdf() {
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
   try {
-    if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+    await ensureHtml2pdf();
     const printBody = document.getElementById('print-body');
     if (printBody.diagramsReady) await printBody.diagramsReady.catch(() => {});
     pageEl.classList.add('exporting-pdf');

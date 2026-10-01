@@ -9,7 +9,12 @@ const PALETTE = DIAGRAM_COLORS.series;
 let mathjsReady = null;
 function ensureMathjs() {
   if (window.math) return Promise.resolve();
-  if (!mathjsReady) mathjsReady = loadScriptOnce('https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js');
+  if (!mathjsReady) {
+    mathjsReady = loadScriptOnce('https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js').catch((err) => {
+      mathjsReady = null;
+      throw err;
+    });
+  }
   return mathjsReady;
 }
 window.ensureMathjs = ensureMathjs;

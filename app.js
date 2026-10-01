@@ -70,8 +70,31 @@ function updateChatDuringStream(update) {
   if (shouldFollow) scrollChatToBottom();
 }
 
+// รวมการอัปเดต DOM ระหว่าง stream ให้เหลือเฟรมละครั้ง (แทนทุก token ที่ทำให้บังคับ layout + เขียนข้อความทั้งก้อนซ้ำๆ)
+// ต้อง cancel() ตอนจบ/error เสมอ ไม่งั้นเฟรมที่ค้างอยู่อาจไปเขียนทับ bubble ที่ render เสร็จแล้ว
+function createFrameScheduler(callback) {
+  const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 16);
+  const caf = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
+  let handle = null;
+  return {
+    schedule() {
+      if (handle !== null) return;
+      handle = raf(() => {
+        handle = null;
+        callback();
+      });
+    },
+    cancel() {
+      if (handle === null) return;
+      caf(handle);
+      handle = null;
+    },
+  };
+}
+
 function init() {
   window.addEventListener('teacherai-storage-unavailable', showStorageNotice, { once: true });
+  window.addEventListener('teacherai-sessions-changed', renderSessionList); // อีกแท็บบันทึกงานใหม่
   applyTheme(getTheme());
   renderSessionList();
   wireEvents();
@@ -141,7 +164,7 @@ function toggleTheme() {
 // ---------- Sidebar / session management ----------
 
 function renderSessionList() {
-  const sessions = getSessions();
+  const sessions = getSessionSummaries();
   el.sessionList.innerHTML = '';
   if (sessions.length === 0) {
     const empty = document.createElement('div');
@@ -200,7 +223,7 @@ function selectSession(id) {
 function recoverInterruptedSession(session) {
   if (session.mode !== 'exercise' || !session.exerciseSets) return;
   for (const set of Object.values(session.exerciseSets)) {
-    if (set.status === 'pending' || set.status === 'streaming') {
+    if (set.status === 'pending' || set.status === 'streaming' || set.status === 'repairing') {
       set.status = 'error';
       set.content = '⚠️ การสร้างถูกขัดจังหวะ กด "สร้างใหม่ชุดนี้" เพื่อลองอีกครั้ง';
     }
@@ -399,11 +422,12 @@ function attachDiagramEditButtons(container, getContent, setContent) {
       const originalContent = getContent();
       activeSession = owner;
       setBusy(true);
+      let updatedContent = null;
       try {
         const newSource = await requestDiagramEdit(target.source);
         if (newSource && getContent() === originalContent) {
           JSON.parse(newSource.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"));
-          setContent(replaceDiagramBlock(getContent(), blockIndex, newSource, target.lang));
+          updatedContent = replaceDiagramBlock(getContent(), blockIndex, newSource, target.lang);
         } else if (newSource) {
           throw new Error('เนื้อหารูปนี้เปลี่ยนไประหว่างแก้ไข จึงไม่ได้นำคำตอบมาใช้');
         }
@@ -415,6 +439,8 @@ function attachDiagramEditButtons(container, getContent, setContent) {
         btn.disabled = false;
         btn.textContent = '✏️ แก้รูปนี้';
       }
+      // บันทึก/วาดใหม่หลังเลิก busy แล้วเท่านั้น — ถ้าวาดตอนยัง busy ข้อความสุดท้ายจะถูกวาดเป็นโหมด streaming (text ดิบ)
+      if (updatedContent !== null) setContent(updatedContent);
     });
     fig.appendChild(btn);
   });
@@ -681,7 +707,39 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
   const isViewing = () => currentSession === session;
   const bubbleEl = () => (isViewing() ? document.querySelector(`#msg-${idx} .msg-bubble`) : null);
 
+  let reasoningDirty = false;
+  let contentDirty = false;
+  const flushStream = () => {
+    if (!reasoningDirty && !contentDirty) return;
+    const b = bubbleEl();
+    if (!b) return;
+    updateChatDuringStream(() => {
+      if (reasoningDirty) {
+        let r = b.querySelector('.reasoning-block');
+        if (!r) {
+          r = document.createElement('div');
+          r.className = 'reasoning-block';
+          b.prepend(r);
+        }
+        r.textContent = '🧠 ' + assistantMsg.reasoning;
+      }
+      if (contentDirty) {
+        let c = b.querySelector('.markdown-body');
+        if (!c) {
+          c = document.createElement('div');
+          c.className = 'markdown-body streaming';
+          b.appendChild(c);
+        }
+        c.textContent = displayStreamingText(assistantMsg.content);
+      }
+    });
+    reasoningDirty = false;
+    contentDirty = false;
+  };
+  const streamFrame = createFrameScheduler(flushStream);
+
   const finish = () => {
+    streamFrame.cancel();
     const scrollState = isViewing() ? captureChatScrollState() : null;
     activeSession = null;
     setBusy(false);
@@ -691,36 +749,17 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
 
   callOpenRouterStream(apiMessages, {
     onReasoningToken: (chunk) => {
-      updateChatDuringStream(() => {
-        assistantMsg.reasoning += chunk;
-        const b = bubbleEl();
-        if (b) {
-          let r = b.querySelector('.reasoning-block');
-          if (!r) {
-            r = document.createElement('div');
-            r.className = 'reasoning-block';
-            b.prepend(r);
-          }
-          r.textContent = '🧠 ' + assistantMsg.reasoning;
-        }
-      });
+      assistantMsg.reasoning += chunk;
+      reasoningDirty = true;
+      streamFrame.schedule();
     },
     onToken: (_delta, fullText) => {
-      updateChatDuringStream(() => {
-        assistantMsg.content = fullText;
-        const b = bubbleEl();
-        if (b) {
-          let c = b.querySelector('.markdown-body');
-          if (!c) {
-            c = document.createElement('div');
-            c.className = 'markdown-body streaming';
-            b.appendChild(c);
-          }
-          c.textContent = displayStreamingText(fullText);
-        }
-      });
+      assistantMsg.content = fullText;
+      contentDirty = true;
+      streamFrame.schedule();
     },
     onDone: async (fullText) => {
+      streamFrame.cancel();
       assistantMsg.content = fullText;
       if (isFinalStep) {
         const b = bubbleEl();
@@ -748,6 +787,7 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
       finish();
     },
     onError: (err) => {
+      streamFrame.cancel();
       assistantMsg.content = '⚠️ เกิดข้อผิดพลาด: ' + err.message;
       assistantMsg.isError = true;
       finish();
@@ -817,6 +857,7 @@ function generateExerciseLevel(session, level) {
       else updateExerciseCardBody(level);
     };
     const finish = () => {
+      bodyFrame.cancel();
       try {
         persistSession(session);
         refreshCard(true);
@@ -824,6 +865,7 @@ function generateExerciseLevel(session, level) {
         resolve();
       }
     };
+    const bodyFrame = createFrameScheduler(() => refreshCard(false));
     refreshCard(true);
 
     const attachmentBlock = session.attachment
@@ -837,13 +879,14 @@ function generateExerciseLevel(session, level) {
     callOpenRouterStream(apiMessages, {
       onReasoningToken: (chunk) => {
         set.reasoning += chunk;
-        refreshCard(false);
+        bodyFrame.schedule();
       },
       onToken: (_delta, fullText) => {
         set.content = fullText;
-        refreshCard(false);
+        bodyFrame.schedule();
       },
       onDone: async (fullText) => {
+        bodyFrame.cancel();
         set.content = fullText;
         set.status = 'repairing';
         refreshCard(false);
@@ -860,6 +903,7 @@ function generateExerciseLevel(session, level) {
         finish();
       },
       onError: (err) => {
+        bodyFrame.cancel();
         set.status = 'error';
         set.content = '⚠️ เกิดข้อผิดพลาด: ' + err.message;
         finish();
