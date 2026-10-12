@@ -8,7 +8,7 @@ const STORAGE_KEYS = {
 
 const DEFAULT_SETTINGS = {
   apiKey: '',
-  model: 'deepseek/deepseek-v4-flash-0731',
+  model: 'z-ai/glm-5.3-flash',
   reasoningEffort: 'medium',
   effects: 'full',
 };

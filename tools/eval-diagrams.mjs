@@ -42,7 +42,7 @@ const { buildLessonSystemPrompt, buildExerciseSystemPrompt, CONFIRM_TRIGGER_MESS
 console.log('โหลด guide สำเร็จ ความยาว buildDiagramGuide():', context.__exports.buildDiagramGuide().length, 'ตัวอักษร');
 
 // ---------- เรียก OpenRouter (non-streaming เพื่อความง่าย) ----------
-const MODEL = 'deepseek/deepseek-v4-flash-0731';
+const MODEL = 'z-ai/glm-5.3-flash';
 
 async function callModel(messages) {
   const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
