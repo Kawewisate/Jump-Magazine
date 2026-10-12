@@ -68,6 +68,9 @@ AI แทรกรูปประกอบเข้าไปในเนื้�
 | `styles.css` | ธีม/ดีไซน์ |
 | `motion.css` | motion tokens, entry/overlay/slide transitions และ reduced-motion fallback |
 | `motion.js` | ตัวประสาน animation ระหว่างหน้าแชต, modal, preview และสไลด์ |
+| `fx.css` | เลเยอร์อนิเมชั่นอลังการ (ฉากหลัง aurora/god rays/ฟอง, hero, 3D chat/การ์ด/สไลด์) — ทุกกฎอยู่ใต้ `html[data-fx="full"]` |
+| `fx.js` | ตัวคุมเอฟเฟกต์ (parallax, tilt, ripple, อนุภาค, theme wipe) ใช้ GSAP ถ้ามี ไม่มีก็ fallback เป็น CSS; ปิดได้ใน ⚙️ ตั้งค่า > เอฟเฟกต์ภาพ |
+| `stream-text.js` | ตัวแปลงข้อความระหว่าง stream แบบ incremental (ซ่อน JSON ของรูปประกอบโดยไม่สแกนทั้งข้อความทุก token) |
 | `storage.js` | จัดการ localStorage (settings + ประวัติงาน) |
 | `api.js` | เรียก OpenRouter API (streaming) + system prompts |
 | `fileparse.js` | ดึงข้อความจากไฟล์ .pdf / .docx / .txt ที่ครูอัปโหลด |

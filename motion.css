@@ -96,14 +96,23 @@ select:focus-visible {
 .streaming {
   transition: opacity var(--motion-base) ease, background-color var(--motion-base) ease;
 }
-.streaming::after {
+.streaming::after,
+.streaming > .stream-line:last-child::after {
   content: '▋';
   display: inline-block;
   margin-left: 2px;
   color: var(--accent, #168fc4);
   animation: motion-caret 900ms steps(1, end) infinite;
 }
+/* เมื่อ renderer เขียนเป็นบรรทัดย่อย (.stream-line) ให้โชว์ caret ต่อท้ายบรรทัดสุดท้ายเท่านั้น
+   ไม่ใช่ต่อท้าย container เองด้วย (ไม่งั้นจะเห็น caret ซ้อนสองตัว) */
+.streaming:has(.stream-line)::after { content: none; animation: none; }
 @keyframes motion-caret { 0%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
+
+.stream-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .exercise-context.motion-enter-soft,
 .exercise-card.motion-enter {

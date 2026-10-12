@@ -5,6 +5,7 @@ let activeSession = null; // session ที่กำลังเจนอยู�
 let isBusy = false;
 let pendingAttachment = null; // { name, text }
 let isReadingAttachment = false;
+let sessionListAnimated = false;
 let attachReadSeq = 0; // กันผลอ่านไฟล์เก่ามาทับ เมื่อเลือกไฟล์ใหม่/เปลี่ยนงานระหว่างอ่าน
 
 const el = {
@@ -29,6 +30,7 @@ const el = {
   settingsModel: document.getElementById('settings-model'),
   modelChips: document.querySelectorAll('.model-chip'),
   settingsReasoning: document.getElementById('settings-reasoning'),
+  settingsEffects: document.getElementById('settings-effects'),
   settingsCancel: document.getElementById('settings-cancel'),
   printOverlay: document.getElementById('print-overlay'),
   printClose: document.getElementById('print-close'),
@@ -59,20 +61,57 @@ function captureChatScrollState() {
 function restoreChatScrollState(state) {
   if (!state || state.shouldFollow) {
     scrollChatToBottom();
+    chatFollowBottom = true;
     return;
   }
   el.chatMessages.scrollTop = state.scrollTop;
+  chatFollowBottom = false;
 }
 
-function updateChatDuringStream(update) {
-  const shouldFollow = isChatNearBottom();
-  update();
+// ผู้ใช้อยู่ท้ายแชตไหม — จำค่าไว้จาก scroll event แทนการวัด scrollHeight ทุก token (กัน forced layout)
+let chatFollowBottom = true;
+
+// รวมการเขียน DOM ระหว่าง stream ให้เหลือครั้งเดียวต่อเฟรม: ตัวเขียนต้อง idempotent (อ่านสถานะล่าสุดตอน flush)
+const pendingUiUpdates = new Map();
+let uiUpdateFrame = 0;
+
+function scheduleUiUpdate(key, fn, { follow = false } = {}) {
+  pendingUiUpdates.set(key, { fn, follow });
+  if (uiUpdateFrame) return;
+  uiUpdateFrame = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame(flushUiUpdates)
+    : setTimeout(flushUiUpdates, 16);
+}
+
+function cancelUiUpdates(keys) {
+  if (keys) keys.forEach((key) => pendingUiUpdates.delete(key));
+  else pendingUiUpdates.clear();
+}
+
+function flushUiUpdates() {
+  uiUpdateFrame = 0;
+  if (!pendingUiUpdates.size) return;
+  const updates = [...pendingUiUpdates.values()];
+  pendingUiUpdates.clear();
+  const shouldFollow = chatFollowBottom && updates.some((u) => u.follow);
+  updates.forEach((u) => {
+    try {
+      u.fn();
+    } catch (err) {
+      console.error(err);
+    }
+  });
   if (shouldFollow) scrollChatToBottom();
+}
+
+function updateChatDuringStream(update, key = 'chat') {
+  scheduleUiUpdate(key, update, { follow: true });
 }
 
 function init() {
   window.addEventListener('teacherai-storage-unavailable', showStorageNotice, { once: true });
   applyTheme(getTheme());
+  window.FX?.init();
   renderSessionList();
   wireEvents();
   window.MotionUI?.revealView(el.welcomeScreen);
@@ -91,6 +130,9 @@ function wireEvents() {
   el.settingsCancel.addEventListener('click', closeSettingsModal);
   el.settingsForm.addEventListener('submit', onSaveSettings);
   el.themeToggle?.addEventListener('click', toggleTheme);
+  el.settingsEffects?.addEventListener('click', () => {
+    el.settingsEffects.setAttribute('aria-checked', String(el.settingsEffects.getAttribute('aria-checked') !== 'true'));
+  });
   el.printClose.addEventListener('click', closePrintPreview);
   el.printBtn.addEventListener('click', exportPdf);
   el.modelChips.forEach((chip) => {
@@ -102,6 +144,10 @@ function wireEvents() {
   el.settingsModel.addEventListener('input', updateModelChipHighlight);
   el.hamburgerBtn.addEventListener('click', openSidebarDrawer);
   el.sidebarBackdrop.addEventListener('click', closeSidebarDrawer);
+  el.chatMessages.addEventListener('scroll', () => {
+    chatFollowBottom = isChatNearBottom();
+  }, { passive: true });
+  el.sessionList.addEventListener('click', onSessionListClick);
   el.chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -135,13 +181,20 @@ function applyTheme(theme) {
 function toggleTheme() {
   const next = getTheme() === 'night' ? 'day' : 'night';
   saveTheme(next);
-  window.MotionUI?.transitionTheme(() => applyTheme(next));
+  if (window.FX) window.FX.transitionTheme(() => applyTheme(next), el.themeToggle);
+  else window.MotionUI?.transitionTheme(() => applyTheme(next));
 }
 
 // ---------- Sidebar / session management ----------
 
+let sessionListSignature = null;
+
 function renderSessionList() {
   const sessions = getSessions();
+  // ไม่มีอะไรเปลี่ยน (เช่น persistSession ระหว่าง stream) = ไม่ต้องสร้าง DOM ใหม่
+  const signature = (currentSession ? currentSession.id : '') + '|' + sessions.map((s) => [s.id, s.mode, s.title || ''].join('~')).join('|');
+  if (signature === sessionListSignature && el.sessionList.firstChild) return;
+  sessionListSignature = signature;
   el.sessionList.innerHTML = '';
   if (sessions.length === 0) {
     const empty = document.createElement('div');
@@ -150,32 +203,43 @@ function renderSessionList() {
     el.sessionList.appendChild(empty);
     return;
   }
+  const firstRender = !sessionListAnimated;
+  sessionListAnimated = true;
+  let itemIndex = 0;
+  const frag = document.createDocumentFragment();
   for (const s of sessions) {
     const item = document.createElement('div');
-    item.className = 'session-item' + (currentSession && currentSession.id === s.id ? ' active' : '');
+    item.className = 'session-item' + (currentSession && currentSession.id === s.id ? ' active' : '') + (firstRender ? ' fx-enter' : '');
+    item.dataset.sessionId = s.id;
+    item.style.setProperty('--i', String(Math.min(itemIndex++, 12)));
     const icon = s.mode === 'lesson' ? '🎨' : '📝';
     item.innerHTML = `<span class="session-icon">${icon}</span><span class="session-title"></span><button class="session-delete" title="ลบ">✕</button>`;
     item.querySelector('.session-title').textContent = s.title || '(งานไม่มีชื่อ)';
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('.session-delete')) return;
-      selectSession(s.id);
-    });
-    item.querySelector('.session-delete').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (isBusy && activeSession && activeSession.id === s.id) {
-        alert('งานนี้กำลังสร้างเนื้อหาอยู่ รอให้เสร็จก่อนแล้วค่อยลบ');
-        return;
-      }
-      if (confirm('ลบงานนี้ออกจากประวัติ?')) {
-        deleteSession(s.id);
-        if (currentSession && currentSession.id === s.id) {
-          currentSession = null;
-          showWelcome();
-        }
-        renderSessionList();
-      }
-    });
-    el.sessionList.appendChild(item);
+    frag.appendChild(item);
+  }
+  el.sessionList.appendChild(frag);
+}
+
+// listener เดียวที่ #session-list แทนการผูก 2 ตัวต่อแถวทุกครั้งที่ render
+function onSessionListClick(e) {
+  const item = e.target.closest('.session-item');
+  if (!item || !el.sessionList.contains(item)) return;
+  const id = item.dataset.sessionId;
+  if (!e.target.closest('.session-delete')) {
+    selectSession(id);
+    return;
+  }
+  if (isBusy && activeSession && activeSession.id === id) {
+    alert('งานนี้กำลังสร้างเนื้อหาอยู่ รอให้เสร็จก่อนแล้วค่อยลบ');
+    return;
+  }
+  if (confirm('ลบงานนี้ออกจากประวัติ?')) {
+    deleteSession(id);
+    if (currentSession && currentSession.id === id) {
+      currentSession = null;
+      showWelcome();
+    }
+    renderSessionList();
   }
 }
 
@@ -246,6 +310,7 @@ function showChatView() {
   el.welcomeScreen.classList.add('hidden');
   el.chatView.classList.remove('hidden');
   window.MotionUI?.revealView(el.chatView);
+  window.FX?.enterView(el.chatView);
 }
 
 function persistSession(session) {
@@ -313,13 +378,15 @@ function renderAttachChip() {
 
 // ระหว่าง stream ยังไม่อยากโชว์ JSON ดิบของรูปประกอบ ให้แทนด้วยข้อความสถานะไปก่อน
 // (บล็อกที่ปิดสมบูรณ์แล้ว และบล็อกที่กำลังพิมพ์ค้างอยู่ท้ายข้อความ ก็ครอบคลุมทั้งคู่)
-function displayStreamingText(fullText) {
-  let out = fullText.replace(/```(diagram|mermaid)\n[\s\S]*?```/g, '[🖼️ กำลังวาดรูปประกอบ...]');
-  const openFence = out.match(/```(diagram|mermaid)\n[\s\S]*$/);
-  if (openFence) {
-    out = out.slice(0, openFence.index) + '[🖼️ กำลังวาดรูปประกอบ...]';
+// (แปลงแบบ incremental — ดู stream-text.js; แต่ละสตรีมมีตัวแปลงของตัวเอง)
+const streamConverters = new Map();
+function displayStreamingText(fullText, streamKey = 'default') {
+  let convert = streamConverters.get(streamKey);
+  if (!convert) {
+    convert = createStreamingTextConverter();
+    streamConverters.set(streamKey, convert);
   }
-  return out;
+  return convert(fullText);
 }
 
 const MAX_DIAGRAM_REPAIRS = 4;
@@ -422,20 +489,60 @@ function attachDiagramEditButtons(container, getContent, setContent) {
 
 // ---------- Chat rendering ----------
 
+// โหนดข้อความที่ render ไว้แล้วของ session ปัจจุบัน — ข้อความที่ไม่เปลี่ยนจะถูกใช้ซ้ำ ไม่ต้อง parse markdown/KaTeX/วาดรูปใหม่
+let chatRender = { session: null, entries: [] };
+
+function messageSignature(msg, idx) {
+  const isLast = idx === currentSession.messages.length - 1;
+  const generatingHere = isBusy && activeSession === currentSession;
+  return [
+    msg.role, msg.content, msg.displayContent, msg.attachmentName, msg.reasoning, msg.isError, msg.showPdfButton,
+    isLast, isLast && generatingHere, isLast && currentSession.finalGenerated,
+  ];
+}
+
+function sameSignature(a, b) {
+  return a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
 function renderChatView({ animateMessageIndexes = [], animateIntro = false, animateExercise = false, scrollState = null } = {}) {
-  el.chatMessages.innerHTML = '';
+  cancelUiUpdates(); // ตัวเขียน stream ที่ค้างอยู่จะเขียนทับ DOM ที่กำลังสร้างใหม่
   el.sessionTitleDisplay.textContent = currentSession.title || (currentSession.mode === 'lesson' ? 'ออกแบบสื่อการสอน' : 'ออกแบบแบบฝึกหัด');
 
-  if (currentSession.messages.length === 0) {
-    const intro = buildIntroBubble();
-    el.chatMessages.appendChild(intro);
-    if (animateIntro) window.MotionUI?.reveal(intro, 'motion-enter-soft');
+  const messages = currentSession.messages;
+  const canReuse = chatRender.session === currentSession && chatRender.entries.length > 0 && messages.length > 0
+    && chatRender.entries.every((entry) => entry && entry.node.isConnected);
+  if (canReuse) {
+    // เก็บกวาดส่วนที่ไม่ใช่ข้อความ (การ์ดแบบฝึกหัด) และข้อความส่วนเกิน แล้วค่อยตรวจทีละข้อความ
+    el.chatMessages.querySelectorAll('.exercise-context, .exercise-grid').forEach((node) => node.remove());
+    chatRender.entries.splice(messages.length).forEach((entry) => entry.node.remove());
+  } else {
+    el.chatMessages.innerHTML = '';
+    chatRender = { session: currentSession, entries: [] };
   }
 
-  currentSession.messages.forEach((msg, idx) => {
+  if (messages.length === 0) {
+    const intro = buildIntroBubble();
+    el.chatMessages.appendChild(intro);
+    if (animateIntro) {
+      window.MotionUI?.reveal(intro, 'motion-enter-soft');
+      window.FX?.enterMessage(intro);
+    }
+  }
+
+  messages.forEach((msg, idx) => {
+    const sig = messageSignature(msg, idx);
+    const existing = chatRender.entries[idx];
+    const animate = animateMessageIndexes.includes(idx);
+    if (existing && !animate && existing.node.isConnected && sameSignature(existing.sig, sig)) return;
     const message = buildMessageBubble(msg, idx);
-    el.chatMessages.appendChild(message);
-    if (animateMessageIndexes.includes(idx)) window.MotionUI?.reveal(message);
+    if (existing && existing.node.isConnected) existing.node.replaceWith(message);
+    else el.chatMessages.appendChild(message);
+    chatRender.entries[idx] = { node: message, sig };
+    if (animate) {
+      window.MotionUI?.reveal(message);
+      window.FX?.enterMessage(message);
+    }
   });
 
   if (currentSession.mode === 'exercise' && currentSession.exerciseSets) {
@@ -467,7 +574,10 @@ function renderChatView({ animateMessageIndexes = [], animateIntro = false, anim
       contextStatus.id = 'exercise-context-status';
       context.append(contextIcon, contextCopy, contextStatus);
       el.chatMessages.appendChild(context);
-      if (animateExercise) window.MotionUI?.reveal(context, 'motion-enter-soft');
+      if (animateExercise) {
+        window.MotionUI?.reveal(context, 'motion-enter-soft');
+        window.FX?.enterCards([context]);
+      }
 
       const wrap = document.createElement('div');
       wrap.className = 'exercise-grid';
@@ -543,8 +653,9 @@ function buildMessageBubble(msg, idx) {
     if (generatingHere && isLastMsg) {
       // กลับมาดูงานที่ยังเจนไม่เสร็จ: แสดงแบบ streaming ต่อ ยังไม่ต้องโชว์ปุ่มยืนยัน/PDF
       content.classList.add('streaming');
-      content.textContent = displayStreamingText(msg.content);
+      setStreamingText(content, displayStreamingText(msg.content));
       bubble.appendChild(content);
+      div.classList.add('is-streaming');
     } else {
       const session = currentSession;
       renderMarkdownWithMath(content, msg.content);
@@ -634,6 +745,20 @@ function setBusy(busy) {
   isBusy = busy;
   el.sendBtn.disabled = busy;
   el.chatInput.disabled = busy;
+  // หยุดฉากพื้นหลังที่เคลื่อนไหวตลอดเวลา ระหว่างที่กำลังสตรีมคำตอบ (ตอนที่ frame time สำคัญที่สุด)
+  document.documentElement.classList.toggle('fx-busy', busy);
+}
+
+// ---------- Streaming DOM writer: เขียนทีละบรรทัดแทนตั้ง textContent ทั้งก้อนทุกเฟรม ----------
+// renderer ผูกกับ "โหนด" ที่ได้รับ ไม่ใช่ session/level — โหนดใหม่ (สลับ session แล้วกลับมา) ได้ renderer ใหม่โดยอัตโนมัติ
+const streamRenderers = new WeakMap();
+function setStreamingText(container, text) {
+  let render = streamRenderers.get(container);
+  if (!render) {
+    render = createStreamingTextRenderer(container);
+    streamRenderers.set(container, render);
+  }
+  render(text);
 }
 
 // ---------- Mode 1: ออกแบบสื่อการสอน ----------
@@ -681,7 +806,10 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
   const isViewing = () => currentSession === session;
   const bubbleEl = () => (isViewing() ? document.querySelector(`#msg-${idx} .msg-bubble`) : null);
 
+  const streamKey = `lesson-${session.id}-${idx}`;
   const finish = () => {
+    cancelUiUpdates();
+    streamConverters.delete(streamKey);
     const scrollState = isViewing() ? captureChatScrollState() : null;
     activeSession = null;
     setBusy(false);
@@ -691,8 +819,8 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
 
   callOpenRouterStream(apiMessages, {
     onReasoningToken: (chunk) => {
+      assistantMsg.reasoning += chunk;
       updateChatDuringStream(() => {
-        assistantMsg.reasoning += chunk;
         const b = bubbleEl();
         if (b) {
           let r = b.querySelector('.reasoning-block');
@@ -701,13 +829,13 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
             r.className = 'reasoning-block';
             b.prepend(r);
           }
-          r.textContent = '🧠 ' + assistantMsg.reasoning;
+          setStreamingText(r, '🧠 ' + assistantMsg.reasoning);
         }
-      });
+      }, 'reasoning');
     },
     onToken: (_delta, fullText) => {
+      assistantMsg.content = fullText;
       updateChatDuringStream(() => {
-        assistantMsg.content = fullText;
         const b = bubbleEl();
         if (b) {
           let c = b.querySelector('.markdown-body');
@@ -716,19 +844,20 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
             c.className = 'markdown-body streaming';
             b.appendChild(c);
           }
-          c.textContent = displayStreamingText(fullText);
+          setStreamingText(c, displayStreamingText(assistantMsg.content, streamKey));
         }
-      });
+      }, 'content');
     },
     onDone: async (fullText) => {
       assistantMsg.content = fullText;
       if (isFinalStep) {
+        cancelUiUpdates(); // token สุดท้ายที่ค้างอยู่ต้องไม่มาเขียนทับข้อความสถานะ
         const b = bubbleEl();
         if (b) {
           updateChatDuringStream(() => {
             const c = b.querySelector('.markdown-body');
             if (c) c.textContent = '🔧 กำลังตรวจรูปประกอบ...';
-          });
+          }, 'status');
         }
         try {
           const { content: repaired } = await autoRepairDiagrams(fullText, (status) => {
@@ -736,7 +865,7 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
               const bb = bubbleEl();
               const cc = bb && bb.querySelector('.markdown-body');
               if (cc) cc.textContent = status;
-            });
+            }, 'status');
           });
           assistantMsg.content = repaired;
         } catch (err) {
@@ -744,6 +873,7 @@ function runLessonCompletion(isFinalStep, animateMessageIndexes = []) {
         }
         session.finalGenerated = true;
         assistantMsg.showPdfButton = true;
+        if (currentSession === session) window.FX?.celebrate();
       }
       finish();
     },
@@ -813,10 +943,18 @@ function generateExerciseLevel(session, level) {
     // อัปเดตการ์ดเฉพาะตอนที่ผู้ใช้กำลังดู session นี้อยู่
     const refreshCard = (full) => {
       if (currentSession !== session) return;
-      if (full) renderExerciseCard(level);
-      else updateExerciseCardBody(level);
+      if (full) {
+        cancelUiUpdates([`card-${level}`]);
+        renderExerciseCard(level);
+      } else {
+        // รวมการอัปเดตการ์ดเป็นครั้งเดียวต่อเฟรม (ตัวเขียนอ่านสถานะล่าสุดตอน flush)
+        scheduleUiUpdate(`card-${level}`, () => {
+          if (currentSession === session) updateExerciseCardBody(level);
+        });
+      }
     };
     const finish = () => {
+      streamConverters.delete(`ex-${level}`);
       try {
         persistSession(session);
         refreshCard(true);
@@ -888,7 +1026,11 @@ function renderExerciseCard(level, { animate = false } = {}) {
       <div class="exercise-card-footer" id="exercise-footer-${level}"></div>
     `;
     grid.appendChild(card);
-    if (animate) window.MotionUI?.reveal(card);
+    if (animate) {
+      window.MotionUI?.reveal(card);
+      window.FX?.enterCards([card]);
+      card.style.setProperty('--fx-i', String(grid.querySelectorAll('.exercise-card').length));
+    }
   }
   updateExerciseCardBody(level);
   updateExerciseCardFooter(level);
@@ -906,7 +1048,10 @@ function updateExerciseContextStatus() {
     : hasError
       ? `สร้างแล้ว ${done}/${sets.length} ระดับ · มีบางชุดต้องลองใหม่`
       : `กำลังสร้าง ${done}/${sets.length} ระดับ`;
-  status.classList.toggle('is-complete', done === sets.length && sets.length > 0);
+  const complete = done === sets.length && sets.length > 0;
+  const justCompleted = complete && !status.classList.contains('is-complete') && isBusy && activeSession === currentSession;
+  status.classList.toggle('is-complete', complete);
+  if (justCompleted) window.FX?.celebrate();
   status.classList.toggle('has-error', hasError);
 }
 
@@ -919,9 +1064,9 @@ function updateExerciseCardBody(level) {
     body.textContent = 'รอคิว...';
   } else if (set.status === 'streaming') {
     if (set.content) {
-      body.textContent = displayStreamingText(set.content);
+      setStreamingText(body, displayStreamingText(set.content, `ex-${level}`));
     } else if (set.reasoning) {
-      body.textContent = '🧠 กำลังคิด: ' + set.reasoning;
+      setStreamingText(body, '🧠 กำลังคิด: ' + set.reasoning);
     } else {
       body.textContent = 'กำลังสร้าง...';
     }
@@ -980,6 +1125,7 @@ function openSettingsModal() {
   el.settingsApiKey.value = s.apiKey;
   el.settingsModel.value = s.model;
   el.settingsReasoning.value = s.reasoningEffort;
+  el.settingsEffects?.setAttribute('aria-checked', String(s.effects !== 'off'));
   updateModelChipHighlight();
   if (window.MotionUI) window.MotionUI.openLayer(el.settingsModal);
   else el.settingsModal.classList.remove('hidden');
@@ -996,7 +1142,9 @@ function onSaveSettings(e) {
     apiKey: el.settingsApiKey.value.trim(),
     model: el.settingsModel.value.trim() || DEFAULT_SETTINGS.model,
     reasoningEffort: el.settingsReasoning.value,
+    effects: el.settingsEffects?.getAttribute('aria-checked') === 'false' ? 'off' : 'full',
   });
+  window.FX?.setEnabled(getSettings().effects !== 'off');
   closeSettingsModal();
 }
 

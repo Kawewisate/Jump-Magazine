@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="ผู้ช่วยครู AI">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <link rel="stylesheet" href="styles-aero.css">
@@ -21,6 +22,7 @@
 <link rel="stylesheet" href="aero-enhancements.css">
 <link rel="stylesheet" href="night-aero.css">
 <link rel="stylesheet" href="motion.css">
+<link rel="stylesheet" href="fx.css">
 </head>
 <body>
 
@@ -89,9 +91,9 @@
           <div class="visual-halo"></div>
           <span class="visual-orbit orbit-one"></span>
           <span class="visual-orbit orbit-two"></span>
-          <img class="visual-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
-          <img class="visual-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
-          <img class="visual-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
+          <img decoding="async" class="visual-globe" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+          <img decoding="async" class="visual-books" src="assets/vintage/nuvola-bookcase.png" alt="" width="128" height="128">
+          <img decoding="async" class="visual-pencil" src="assets/vintage/nuvola-kwrite.png" alt="" width="128" height="128">
           <span class="visual-spark spark-one">✦</span>
           <span class="visual-spark spark-two">✦</span>
         </div>
@@ -102,11 +104,11 @@
           <div><strong>พร้อมสำหรับครู</strong><p>เริ่มจากหัวข้อหรือแนบไฟล์เดิม แล้วให้ AI ช่วยเรียบเรียง</p></div>
         </article>
         <article class="welcome-feature feature-blue">
-          <img src="assets/vintage/nuvola-mathematics.png" alt="" width="128" height="128">
+          <img loading="lazy" decoding="async" src="assets/vintage/nuvola-mathematics.png" alt="" width="128" height="128">
           <div><strong>ปรับระดับได้</strong><p>ทำแบบฝึกหัดให้เหมาะกับผู้เรียนหลายกลุ่มในครั้งเดียว</p></div>
         </article>
         <article class="welcome-feature feature-yellow">
-          <img src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
+          <img loading="lazy" decoding="async" src="assets/vintage/nuvola-browser.png" alt="" width="440" height="440">
           <div><strong>ไอเดียใหม่เสมอ</strong><p>ต่อยอดคำถามและกิจกรรมให้ห้องเรียนมีชีวิตชีวา</p></div>
         </article>
       </div>
@@ -152,6 +154,12 @@
       </div>
       <div class="modal-hint">โมเดลที่มีคำว่า (ฟรี) คือโมเดลฟรีสำรองไว้ใช้ยามฉุกเฉิน กรณีเครดิต OpenRouter ของโมเดลหลักหมด — คุณภาพและความแม่นยำ (โดยเฉพาะสูตร LaTeX และภาษาไทย) อาจสู้โมเดลหลักไม่ได้</div>
 
+      <div class="fx-switch-row">
+        <label id="settings-effects-label">เอฟเฟกต์ภาพ / อนิเมชั่น</label>
+        <button type="button" id="settings-effects" class="fx-switch" role="switch" aria-checked="true" aria-labelledby="settings-effects-label"><span></span></button>
+      </div>
+      <div class="modal-hint">ปิดเพื่อให้หน้าเว็บนิ่งและเบาเครื่องขึ้น (เหมาะกับเครื่องช้า/มือถือ)</div>
+
       <label for="settings-reasoning">Reasoning effort</label>
       <select id="settings-reasoning">
         <option value="low">low</option>
@@ -192,26 +200,26 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/lib/marked.umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked@18.0.12/lib/marked.umd.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 
-<script src="storage.js"></script>
-<script src="api.js"></script>
-<script src="fileparse.js"></script>
-<script src="diagrams-core.js"></script>
-<script src="diagrams-science.js"></script>
-<script src="diagrams-math.js"></script>
-<script src="diagrams-concept.js"></script>
-<script src="motion.js"></script>
-<script src="print.js"></script>
-<script src="slides.js"></script>
-<script src="app.js"></script>
-<script src="pwa.js"></script>
+<script defer src="storage.js"></script>
+<script defer src="api.js"></script>
+<script defer src="fileparse.js"></script>
+<script defer src="diagrams-core.js"></script>
+<script defer src="diagrams-science.js"></script>
+<script defer src="diagrams-math.js"></script>
+<script defer src="diagrams-concept.js"></script>
+<script defer src="motion.js"></script>
+<script defer src="fx.js"></script>
+<script defer src="print.js"></script>
+<script defer src="slides.js"></script>
+<script defer src="stream-text.js"></script>
+<script defer src="app.js"></script>
+<script defer src="pwa.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-start-mode]').forEach((button) => {

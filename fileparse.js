@@ -1,8 +1,20 @@
 // แปลงไฟล์ที่ครูอัปโหลด (.pdf / .docx / .txt) ให้เป็นข้อความล้วน — ทำงานฝั่ง client ทั้งหมด
 
-if (window.pdfjsLib) {
+// ไลบรารีอ่านไฟล์โหลดตอนแนบไฟล์ครั้งแรกเท่านั้น (ไม่หน่วงการเปิดหน้าเว็บ)
+async function ensurePdfjs() {
+  if (!window.pdfjsLib) {
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+  }
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  return window.pdfjsLib;
+}
+
+async function ensureMammoth() {
+  if (!window.mammoth) {
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js');
+  }
+  return window.mammoth;
 }
 
 const MAX_ATTACHED_CHARS = 15000;
@@ -13,6 +25,7 @@ function truncateForPrompt(text) {
 }
 
 async function extractPdfText(file) {
+  const pdfjsLib = await ensurePdfjs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let text = '';
@@ -25,6 +38,7 @@ async function extractPdfText(file) {
 }
 
 async function extractDocxText(file) {
+  const mammoth = await ensureMammoth();
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   return result.value;

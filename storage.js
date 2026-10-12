@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   apiKey: '',
   model: 'deepseek/deepseek-v4-flash-0731',
   reasoningEffort: 'medium',
+  effects: 'full',
 };
 
 const storageCache = new Map();
@@ -72,6 +73,7 @@ function normalizeSettings(value) {
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : DEFAULT_SETTINGS.apiKey,
     model: typeof value.model === 'string' && value.model.trim() ? value.model : DEFAULT_SETTINGS.model,
     reasoningEffort,
+    effects: value.effects === 'off' ? 'off' : 'full',
   };
 }
 
@@ -89,18 +91,23 @@ function normalizeSession(value) {
   return session;
 }
 
+let settingsCache = null;
+
 function getSettings() {
+  if (settingsCache) return { ...settingsCache };
   try {
     const raw = readStorage(STORAGE_KEYS.SETTINGS);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    return normalizeSettings(JSON.parse(raw));
+    settingsCache = raw ? normalizeSettings(JSON.parse(raw)) : { ...DEFAULT_SETTINGS };
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    settingsCache = { ...DEFAULT_SETTINGS };
   }
+  return { ...settingsCache };
 }
 
 function saveSettings(settings) {
-  writeStorage(STORAGE_KEYS.SETTINGS, JSON.stringify(normalizeSettings(settings)));
+  const normalized = normalizeSettings(settings);
+  settingsCache = normalized;
+  writeStorage(STORAGE_KEYS.SETTINGS, JSON.stringify(normalized));
 }
 
 function getTheme() {
@@ -111,23 +118,36 @@ function saveTheme(theme) {
   writeStorage(STORAGE_KEYS.THEME, theme === 'night' ? 'night' : 'day');
 }
 
+// รายการงานเก็บไว้ในหน่วยความจำ (parse ครั้งเดียว) แล้วเขียนลง localStorage แบบ debounce
+// เพื่อไม่ต้อง JSON.parse/stringify ทั้งก้อนทุกครั้งที่ persistSession() ถูกเรียกระหว่าง stream
+let sessionsCache = null;
+let sessionsDirty = false;
+let sessionsFlushTimer = null;
+const SESSIONS_FLUSH_DELAY_MS = 250;
+
 function getSessions() {
-  try {
-    const raw = readStorage(STORAGE_KEYS.SESSIONS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeSession).filter(Boolean) : [];
-  } catch {
-    return [];
+  if (!sessionsCache) {
+    try {
+      const raw = readStorage(STORAGE_KEYS.SESSIONS);
+      const parsed = raw ? JSON.parse(raw) : [];
+      sessionsCache = Array.isArray(parsed) ? parsed.map(normalizeSession).filter(Boolean) : [];
+    } catch {
+      sessionsCache = [];
+    }
   }
+  return sessionsCache.slice();
 }
 
 let storageFullWarned = false;
 
-function saveSessions(sessions) {
+function flushSessions() {
+  if (sessionsFlushTimer !== null && typeof clearTimeout === 'function') clearTimeout(sessionsFlushTimer);
+  sessionsFlushTimer = null;
+  if (!sessionsDirty || !sessionsCache) return;
+  sessionsDirty = false;
   try {
     // ไม่เก็บ reasoning (ความคิดของโมเดล) ลง storage — ยาวมากและกินพื้นที่ localStorage (~5MB) เร็ว
-    const json = JSON.stringify(sessions, (key, value) => (key === 'reasoning' ? undefined : value));
+    const json = JSON.stringify(sessionsCache, (key, value) => (key === 'reasoning' ? undefined : value));
     writeStorage(STORAGE_KEYS.SESSIONS, json);
     storageFullWarned = false;
   } catch (err) {
@@ -136,6 +156,26 @@ function saveSessions(sessions) {
       storageFullWarned = true;
       alert('บันทึกประวัติงานไม่สำเร็จ — พื้นที่เก็บข้อมูลของเบราว์เซอร์อาจเต็ม ลองลบงานเก่าที่ไม่ใช้แล้วในแถบประวัติงาน');
     }
+  }
+}
+
+function saveSessions(sessions) {
+  sessionsCache = Array.isArray(sessions) ? sessions.slice() : [];
+  sessionsDirty = true;
+  if (typeof setTimeout !== 'function') {
+    flushSessions();
+    return;
+  }
+  if (sessionsFlushTimer === null) sessionsFlushTimer = setTimeout(flushSessions, SESSIONS_FLUSH_DELAY_MS);
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('pagehide', flushSessions);
+  window.addEventListener('beforeunload', flushSessions);
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushSessions();
+    });
   }
 }
 

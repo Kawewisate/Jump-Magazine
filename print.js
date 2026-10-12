@@ -78,6 +78,18 @@ function sanitizeFilename(name) {
   return (name || 'เอกสาร').replace(/[\\/:*?"<>|]+/g, '_').trim().slice(0, 80) || 'เอกสาร';
 }
 
+// html2pdf (~1 MB) โหลดตอนกดสร้าง PDF ครั้งแรกเท่านั้น; ใช้ร่วมกับ slides.js
+async function ensureHtml2pdf() {
+  if (typeof window.html2pdf !== 'function') {
+    try {
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js');
+    } catch {
+      // ตกไปที่ข้อความ error ด้านล่าง
+    }
+  }
+  if (typeof window.html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+}
+
 // สร้างไฟล์ PDF ตรงจากเนื้อหาในพรีวิว ด้วย html2pdf.js (html2canvas + jsPDF)
 // เลือกวิธีนี้แทนการพึ่ง window.print()/Ctrl+P เพราะเบราว์เซอร์ (โดยเฉพาะ Chrome)
 // มีบั๊กเรื่องการแบ่งหน้าพิมพ์กับ element ที่ตั้ง overflow ไว้ ทำให้ได้ PDF หน้าเปล่า/ไม่ครบ
@@ -92,7 +104,7 @@ async function exportPdf() {
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
   try {
-    if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+    await ensureHtml2pdf();
     const printBody = document.getElementById('print-body');
     if (printBody.diagramsReady) await printBody.diagramsReady.catch(() => {});
     pageEl.classList.add('exporting-pdf');

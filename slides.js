@@ -236,7 +236,7 @@ async function exportSlidesPdf() {
   const container = document.createElement('div');
   let containerAttached = false;
   try {
-    if (typeof html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+    await ensureHtml2pdf();
     slideState.slides.forEach((_, i) => {
       const page = el.stage.children[i].cloneNode(true);
       page.classList.add('slide-pdf-page');

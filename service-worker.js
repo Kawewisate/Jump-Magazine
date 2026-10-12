@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teacher-ai-shell-v1';
+const CACHE_NAME = 'teacher-ai-shell-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,14 +8,17 @@ const APP_SHELL = [
   './aero-enhancements.css',
   './night-aero.css',
   './motion.css',
+  './fx.css',
   './storage.js',
   './api.js',
+  './stream-text.js',
   './fileparse.js',
   './diagrams-core.js',
   './diagrams-science.js',
   './diagrams-math.js',
   './diagrams-concept.js',
   './motion.js',
+  './fx.js',
   './print.js',
   './slides.js',
   './app.js',
@@ -32,9 +35,15 @@ const APP_SHELL = [
   './assets/vintage/nuvola-kwrite.png',
   './assets/vintage/nuvola-mathematics.png'
 ];
+const OPTIONAL_CDN = [
+  'https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js',
+];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL).then(() =>
+    // CDN libs are best-effort so an offline/blocked CDN never fails the install.
+    Promise.allSettled(OPTIONAL_CDN.map((url) => cache.add(url)))
+  )));
   self.skipWaiting();
 });
 
