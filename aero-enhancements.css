@@ -9,6 +9,11 @@
   mix-blend-mode: screen;
 }
 #main-panel { background: rgba(224, 250, 255, .23); }
+/* มือถือไม่มี backdrop blur (แพงมากบน GPU มือถือ) จึงทึบขึ้นแทนเพื่อให้อ่านง่ายเท่าเดิม */
+@media (max-width: 900px) {
+  #main-panel { background: rgba(224, 250, 255, .6); }
+  #sidebar { background: linear-gradient(145deg, #f4feff, #c8f0f9); }
+}
 
 #welcome-screen {
   justify-content: flex-start;
@@ -72,7 +77,9 @@
   box-shadow: inset 0 2px 0 #fff, 0 5px 11px rgba(0, 86, 122, .15);
   transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
 }
-.welcome-cta:hover { transform: translateY(-2px); filter: saturate(1.08); box-shadow: inset 0 2px 0 #fff, 0 8px 16px rgba(0, 86, 122, .2); }
+@media (hover: hover) and (pointer: fine) {
+  .welcome-cta:hover { transform: translateY(-2px); filter: saturate(1.08); box-shadow: inset 0 2px 0 #fff, 0 8px 16px rgba(0, 86, 122, .2); }
+}
 .welcome-cta:active { transform: translateY(1px); }
 .welcome-cta > span:nth-child(2) { flex: 1; min-width: 0; }
 .welcome-cta strong, .welcome-cta small { display: block; }
@@ -309,7 +316,7 @@ html[data-theme="night"] .slide-page:after { opacity: .32; }
   #welcome-screen { padding: 18px 14px 22px; }
   .welcome-layout { grid-template-columns: 1fr; min-height: 0; padding: 18px; }
   .welcome-copy { padding: 2px; }
-  .welcome-visual { min-height: 235px; margin-top: -4px; }
+  .welcome-visual { min-height: 235px; margin-top: 20px; }
   .visual-globe { top: 2%; left: 30%; width: min(54%, 190px); }
   .visual-books { right: 11%; bottom: 3%; width: 27%; }
   .visual-pencil { left: 13%; bottom: 1%; width: 24%; }

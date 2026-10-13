@@ -112,6 +112,8 @@ function init() {
   window.addEventListener('teacherai-storage-unavailable', showStorageNotice, { once: true });
   applyTheme(getTheme());
   window.FX?.init();
+  // จอแคบ: placeholder ยาวจะตัดบรรทัดแล้วโดนตัดครึ่ง (และมือถือไม่มี Shift+Enter อยู่แล้ว)
+  if (window.matchMedia?.('(max-width: 600px)').matches) el.chatInput.placeholder = 'พิมพ์ข้อความ...';
   renderSessionList();
   wireEvents();
   window.MotionUI?.revealView(el.welcomeScreen);

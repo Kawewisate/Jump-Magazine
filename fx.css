@@ -237,14 +237,18 @@ html[data-fx="full"] .session-item::before {
   transform: scaleY(0);
   transition: transform .3s var(--fx-spring);
 }
-html[data-fx="full"] .session-item:hover { transform: translateX(4px); }
-html[data-fx="full"] .session-item:hover::before,
+@media (hover: hover) and (pointer: fine) {
+  html[data-fx="full"] .session-item:hover { transform: translateX(4px); }
+  html[data-fx="full"] .session-item:hover::before { transform: scaleY(1); }
+}
 html[data-fx="full"] .session-item.active::before { transform: scaleY(1); }
 html[data-fx="full"] .session-item.fx-enter { animation: fx-session-in .55s var(--fx-spring) calc(var(--i, 0) * 45ms) backwards; }
 @keyframes fx-session-in { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
 
 html[data-fx="full"] .theme-toggle-icon { transition: transform .6s var(--fx-spring); }
-html[data-fx="full"] .theme-toggle:hover .theme-toggle-icon { transform: rotate(180deg) scale(1.15); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-fx="full"] .theme-toggle:hover .theme-toggle-icon { transform: rotate(180deg) scale(1.15); }
+}
 html[data-fx="full"] .brand-mark-globe { animation: fx-brand-spin 24s linear infinite; }
 @keyframes fx-brand-spin { 0%, 90% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
 
@@ -307,8 +311,10 @@ html[data-fx="full"] figure.diagram { animation: fx-diagram-in .9s var(--fx-spri
 html[data-fx="full"] .pdf-btn,
 html[data-fx="full"] .confirm-btn,
 html[data-fx="full"] .regen-btn { transition: transform .25s var(--fx-spring), box-shadow .25s ease; }
-html[data-fx="full"] .pdf-btn:hover,
-html[data-fx="full"] .confirm-btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 20px rgba(0, 86, 122, .25), 0 0 18px var(--fx-glow-aqua); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-fx="full"] .pdf-btn:hover,
+  html[data-fx="full"] .confirm-btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 20px rgba(0, 86, 122, .25), 0 0 18px var(--fx-glow-aqua); }
+}
 html[data-fx="full"] .confirm-btn { position: relative; overflow: visible; }
 html[data-fx="full"] .confirm-btn::after {
   content: '';
@@ -330,7 +336,9 @@ html[data-fx="full"] #chat-form:focus-within {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 0 0 5px rgba(60, 195, 240, .5), 0 12px 28px rgba(0, 110, 160, .28), 0 0 30px var(--fx-glow-aqua);
 }
 html[data-fx="full"] #send-btn { position: relative; overflow: hidden; transition: transform .25s var(--fx-spring), box-shadow .25s ease, filter .2s ease; }
-html[data-fx="full"] #send-btn:not(:disabled):hover { transform: scale(1.14) rotate(-8deg); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .72), 0 0 20px var(--fx-glow-aqua); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-fx="full"] #send-btn:not(:disabled):hover { transform: scale(1.14) rotate(-8deg); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .72), 0 0 20px var(--fx-glow-aqua); }
+}
 html[data-fx="full"] #send-btn:not(:disabled):active { transform: scale(.88); }
 html[data-fx="full"] #chat-view.motion-view-enter,
 html[data-fx="full"] #welcome-screen.motion-view-enter { animation-duration: .7s; }
@@ -388,8 +396,10 @@ html[data-fx="full"] .slide-page.active .slide-body > *:nth-child(4) { animation
 html[data-fx="full"] .slide-page.active .slide-body > *:nth-child(n+5) { animation-delay: .4s; }
 html[data-fx="full"] .slide-toolbar button,
 html[data-fx="full"] .print-toolbar button { transition: transform .25s var(--fx-spring), box-shadow .25s ease; }
-html[data-fx="full"] .slide-toolbar button:hover,
-html[data-fx="full"] .print-toolbar button:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 8px 16px rgba(0, 37, 72, .3), 0 0 16px var(--fx-glow-aqua); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-fx="full"] .slide-toolbar button:hover,
+  html[data-fx="full"] .print-toolbar button:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 8px 16px rgba(0, 37, 72, .3), 0 0 16px var(--fx-glow-aqua); }
+}
 
 html[data-fx="full"] #sidebar { transition: transform .5s var(--fx-spring), box-shadow .3s ease; }
 html[data-fx="full"] #sidebar-backdrop { transition: opacity .4s ease; backdrop-filter: blur(4px); }
@@ -412,15 +422,63 @@ html[data-fx="full"] #sidebar-backdrop { transition: opacity .4s ease; backdrop-
 .fx-switch[aria-checked="true"] { background: linear-gradient(180deg, #6fe58a, #26a63d); }
 .fx-switch[aria-checked="true"] span { transform: translateX(24px); }
 
-/* ---------- Mobile: cheaper, same character ---------- */
-@media (max-width: 900px) {
-  html[data-fx="full"] .fx-caustics { display: none; }
+/* ---------- Mobile: cheaper, same character ----------
+   มือถือ GPU อ่อน: ตัดฉากหลังที่ขยับตลอด/ซ้อนกันหลายชั้น, เลิกใช้ 3D + blur ตอนเข้า, ไม่ให้ลิ้นชักเด้ง */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  html[data-fx="full"] .fx-caustics,
+  html[data-fx="full"] .fx-godrays,
+  html[data-fx="full"] .fx-aurora-2,
+  html[data-fx="full"] .fx-bubble ~ .fx-bubble ~ .fx-bubble { display: none; }
+  html[data-fx="full"] .fx-aurora-1 { animation: none; translate: none; will-change: auto; }
+  html[data-fx="full"] .fx-bubble::after,
+  html[data-fx="full"] .aero-sun,
+  html[data-fx="full"] .aero-glint,
+  html[data-fx="full"] .brand-mark-globe,
+  html[data-fx="full"] .visual-halo,
+  html[data-fx="full"] .visual-orbit,
+  html[data-fx="full"] .visual-spark,
+  html[data-fx="full"] .modal::before,
+  html[data-fx="full"] .exercise-card-header::after,
+  html[data-fx="full"] .confirm-btn::after,
+  html[data-fx="full"] .msg.is-streaming .msg-bubble::before { animation: none; }
+  html[data-fx="full"] .aero-sun,
+  html[data-fx="full"] .aero-glint { will-change: auto; }
+  html[data-fx="full"] #welcome-screen h2 .fx-emoji { animation: fx-fade-up .6s var(--fx-swoosh) .6s both; }
+  html[data-fx="full"] .visual-books { animation: fx-item-in .8s var(--fx-swoosh) .5s both; }
+  html[data-fx="full"] .visual-pencil { animation: fx-item-in .8s var(--fx-swoosh) .6s both; }
+  html[data-fx="full"] .visual-globe { animation: fx-fade-up .7s var(--fx-swoosh) .3s both, fx-globe-float 8s ease-in-out 1.2s infinite; }
+  html[data-fx="full"] .welcome-visual { transform: none; transition: none; }
+
+  /* 2D entries only: 3D + filter blur inside scroll containers flickers on mobile browsers */
+  html[data-fx="full"] #app,
+  html[data-fx="full"] #chat-messages,
+  html[data-fx="full"] .exercise-grid,
+  html[data-fx="full"] #slide-stage { perspective: none; }
+  html[data-fx="full"] .welcome-layout { animation: fx-fade-up .6s var(--fx-swoosh) both; transform-style: flat; }
+  html[data-fx="full"] #welcome-screen h2 .fx-word { animation: fx-fade-up .6s var(--fx-swoosh) calc(.2s + var(--i, 0) * 50ms) both; }
+  html[data-fx="full"] .msg.fx-enter { animation: fx-fade-up .45s var(--fx-swoosh) both; }
+  html[data-fx="full"] .exercise-card.fx-enter { animation: fx-fade-up .55s var(--fx-swoosh) calc(var(--fx-i, 0) * 90ms) both; }
+  html[data-fx="full"] .modal-overlay.motion-layer .modal,
+  html[data-fx="full"] .print-overlay.motion-layer #print-page,
+  html[data-fx="full"] .slide-overlay.motion-layer #slide-viewport { animation: fx-fade-up .4s var(--fx-swoosh) both; }
+  html[data-fx="full"] .slide-page,
+  html[data-fx="full"] .slide-page.is-before,
+  html[data-fx="full"] .slide-page.is-after { filter: none; }
+  html[data-fx="full"] .slide-page:not(.active) { transform: translate3d(3%, 0, 0); }
+  html[data-fx="full"] .slide-page.is-before { transform: translate3d(-3%, 0, 0); }
+
+  html[data-fx="full"] #sidebar { transition: transform .25s ease, visibility 0s linear .25s; }
+  html[data-fx="full"] #sidebar.open { transition: transform .25s ease, visibility 0s; }
+  html[data-fx="full"] #sidebar-backdrop { backdrop-filter: none; }
+  html[data-fx="full"] #chat-form:focus-within { transform: none; }
 }
 
 /* ---------- Pause the moving background while the AI is generating ---------- */
 html.fx-busy .fx-layer,
+html.fx-busy .fx-layer::after,
 html.fx-busy .aero-sun,
-html.fx-busy .aero-glint { animation-play-state: paused; }
+html.fx-busy .aero-glint,
+html.fx-busy .brand-mark-globe { animation-play-state: paused; }
 
 /* ---------- Compositing hints (no visual change) ---------- */
 html[data-fx="full"] .fx-godrays,

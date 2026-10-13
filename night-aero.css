@@ -270,3 +270,9 @@ html[data-theme="night"] #print-page.exporting-pdf .molecule-layer-dark { displa
   html[data-theme="night"] #print-page .molecule-layer-light { display: block; }
   html[data-theme="night"] #print-page .molecule-layer-dark { display: none; }
 }
+
+/* Mobile has no backdrop blur on the main panel, so make the night glass more opaque to keep text readable. */
+@media (max-width: 900px) {
+  html[data-theme="night"] #main-panel { background: rgba(3, 35, 65, .72); }
+  html[data-theme="night"] #sidebar { background: linear-gradient(145deg, #08365b, #075270); }
+}
