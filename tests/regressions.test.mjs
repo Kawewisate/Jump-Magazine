@@ -106,7 +106,7 @@ test('motion coordinator respects reduced motion and still resolves UI state', a
 
 test('PWA manifest defines a relative standalone install', () => {
   const manifest = JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
-  assert.equal(manifest.name, 'ผู้ช่วยครู AI');
+  assert.equal(manifest.name, 'ครูพร้อมสอน');
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');

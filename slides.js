@@ -183,7 +183,7 @@ function renderAllSlides() {
       div.appendChild(h);
       const sub = document.createElement('div');
       sub.className = 'slide-subtitle';
-      sub.textContent = 'สื่อการสอนโดย ผู้ช่วยครู AI';
+      sub.textContent = 'สื่อการสอนโดย ครูพร้อมสอน';
       div.appendChild(sub);
     } else {
       if (slide.heading) {

@@ -546,35 +546,163 @@ registerDiagram({
   aliases: ['venn-diagram', 'sets'],
   guide: `แผนภาพเวนน์ (2-3 เซต): {"type":"venn","sets":[{"label":"A","items":"2,4,6"},{"label":"B","items":"3,6,9"}],"universe":"1..10"}
 - sets: 2 หรือ 3 เซต, items คือข้อความที่จะแสดงในวงกลม (เขียนเป็น string ตามต้องการ ไม่ต้องคำนวณ intersection เอง ระบบวาดวงซ้อนให้)
-- universe: label มุมบนซ้ายแสดงเซตทั้งหมด (ถ้ามี)`,
+- universe: label มุมบนซ้ายแสดงเซตทั้งหมด (ถ้ามี)
+- both: (เฉพาะ 2 เซต) ข้อความในส่วนที่ซ้อนกัน เช่น "6" หรือ "ทั้งสองแบบ" (ถ้ามี)
+- items ยาวเป็นประโยคได้ คั่นแต่ละข้อด้วย , หรือส่งเป็น array ระบบตัดบรรทัดและขยายวงให้พอดีเอง`,
   render(spec) {
-    const sets = spec.sets || [];
-    const W = 320, H = 260;
-    const svg = baseSvg(W, H);
-    if (spec.universe) {
-      svg.appendChild(svgEl('rect', { x: 5, y: 5, width: W - 10, height: H - 10, fill: 'none', stroke: MATH_STROKE, 'stroke-width': 1.5 }));
-      svg.appendChild(textEl(20, 22, spec.universe, { 'font-size': 11, 'text-anchor': 'start' }));
-    }
-    const r = 75;
-    const positions =
-      sets.length === 3
-        ? [[W / 2 - 45, H / 2 - 20], [W / 2 + 45, H / 2 - 20], [W / 2, H / 2 + 45]]
-        : sets.length === 2
-        ? [[W / 2 - 45, H / 2], [W / 2 + 45, H / 2]]
-        : [[W / 2, H / 2]];
-    sets.forEach((s, i) => {
-      const [cx, cy] = positions[i];
-      svg.appendChild(svgEl('circle', { cx, cy, r, fill: PALETTE[i % PALETTE.length], opacity: 0.25, stroke: PALETTE[i % PALETTE.length], 'stroke-width': 2 }));
-    });
-    sets.forEach((s, i) => {
-      const [cx, cy] = positions[i];
-      const labelY = sets.length === 3 ? (i === 2 ? cy + r + 5 : cy - r - 8) : cy - r - 8;
-      svg.appendChild(textEl(cx, labelY, s.label, { 'font-size': 13, 'font-weight': 'bold' }));
-      if (s.items) svg.appendChild(multilineText(cx, cy + (sets.length === 3 ? (i === 2 ? 30 : -10) : 0), String(s.items), { 'font-size': 11 }));
-    });
-    return svg;
+    const sets = (spec.sets || []).slice(0, 3);
+    if (sets.length === 3) return renderVenn3(spec, sets);
+    return renderVenn2(spec, sets);
   },
 });
+
+const VENN_FONT = 12;
+const VENN_LINE = 16;
+const VENN_ITEM_GAP = 4;
+const VENN_PAD = 10;
+
+// items: array หรือ string — ข้อสั้นๆ (เช่น "2,4,6") จับรวมบรรทัดเดียวกัน ข้อยาวขึ้นบรรทัดใหม่ทีละข้อ
+function vennItems(raw) {
+  if (raw == null || raw === '') return [];
+  const list = Array.isArray(raw)
+    ? raw.map((x) => String(x).trim())
+    : String(raw).split(/[\n;,]/).map((x) => x.trim());
+  return list.filter(Boolean);
+}
+
+function vennLines(raw, width) {
+  const items = vennItems(raw);
+  if (!items.length) return [];
+  if (items.every((x) => x.length <= 6)) {
+    return wrapTextLines(items.join(', '), width, VENN_FONT).map((text) => ({ text, gap: 0 }));
+  }
+  const out = [];
+  items.forEach((item, i) => {
+    wrapTextLines(item, width, VENN_FONT).forEach((text, j) => out.push({ text, gap: i > 0 && j === 0 ? VENN_ITEM_GAP : 0 }));
+  });
+  return out;
+}
+
+function vennBlockHeight(lines) {
+  return lines.reduce((h, l) => h + VENN_LINE + l.gap, 0);
+}
+
+// วางบรรทัดให้กึ่งกลางแนวตั้งที่ cy; xAt(y) บอกจุดกึ่งกลางแนวนอนของบรรทัดที่ระดับ y
+function drawVennLines(svg, lines, cy, xAt) {
+  let y = cy - vennBlockHeight(lines) / 2;
+  lines.forEach((l) => {
+    y += l.gap;
+    const mid = y + VENN_LINE / 2;
+    svg.appendChild(textEl(xAt(mid - cy), mid + VENN_FONT * 0.35, l.text, { 'font-size': VENN_FONT }));
+    y += VENN_LINE;
+  });
+}
+
+function maxLineWidth(lines) {
+  return lines.reduce((m, l) => Math.max(m, measureTextWidth(l.text, VENN_FONT)), 0);
+}
+
+// 2 เซต (หรือ 1): ใช้วงรีที่สูงขึ้นได้ตามปริมาณข้อความ ความกว้างรูปจึงไม่บานจนตัวหนังสือเล็กบนมือถือ
+// ส่วนเฉพาะของแต่ละวงกว้างคงที่ = ระยะห่างจุดศูนย์กลาง d ทุกระดับ y ส่วนซ้อนกว้าง 2·rx·√(1−y²/ry²) − d
+function renderVenn2(spec, sets) {
+  const two = sets.length === 2;
+  const hasBoth = two && vennItems(spec.both || spec.intersection).length > 0;
+  let layout = null;
+  for (const rx of [85, 100, 115, 130]) {
+    const d = two ? rx * (hasBoth ? 1.15 : 1.4) : 0;
+    const soloW = (two ? d : rx * 1.6) - VENN_PAD * 2;
+    const solo = sets.map((s) => vennLines(s.items, soloW));
+    const soloH = Math.max(0, ...solo.map(vennBlockHeight));
+    let ry = Math.max(rx * 0.85, soloH / 1.5);
+    let both = [];
+    if (hasBoth) {
+      for (let tries = 0; tries < 40; tries++, ry += 6) {
+        const half = (h) => 2 * rx * Math.sqrt(Math.max(0, 1 - (h / ry) ** 2)) - d - VENN_PAD * 2;
+        let w = half(0);
+        for (let k = 0; k < 4 && w > 20; k++) {
+          both = vennLines(spec.both || spec.intersection, w);
+          const need = half(vennBlockHeight(both) / 2);
+          if (maxLineWidth(both) <= need) { w = -1; break; }
+          w = need;
+        }
+        if (w === -1) break;
+      }
+    }
+    layout = { rx, ry, d, solo, both };
+    if (ry <= rx * 1.35 && Math.max(...solo.map((l) => l.length)) <= 6) break;
+  }
+  const { rx, ry, d, solo, both } = layout;
+
+  const margin = 20;
+  const top = spec.universe ? 52 : 34;
+  const W = Math.round(2 * rx + d + margin * 2);
+  const H = Math.round(top + 2 * ry + margin);
+  const cy = top + ry;
+  const cxs = two ? [W / 2 - d / 2, W / 2 + d / 2] : [W / 2];
+  const svg = baseSvg(W, H);
+  if (spec.universe) {
+    svg.appendChild(svgEl('rect', { x: 5, y: 5, width: W - 10, height: H - 10, fill: 'none', stroke: MATH_STROKE, 'stroke-width': 1.5 }));
+    svg.appendChild(textEl(16, 22, spec.universe, { 'font-size': 11, 'text-anchor': 'start' }));
+  }
+  sets.forEach((s, i) => {
+    const color = PALETTE[i % PALETTE.length];
+    svg.appendChild(svgEl('ellipse', { cx: cxs[i], cy, rx, ry, fill: color, opacity: 0.25, stroke: color, 'stroke-width': 2 }));
+  });
+  const edge = (y) => rx * Math.sqrt(Math.max(0, 1 - (y / ry) ** 2));
+  sets.forEach((s, i) => {
+    // ชื่อเซตอยู่เหนือส่วนเฉพาะของวงตัวเอง (ไม่ใช่กลางวง) จะได้ไม่ชนกัน
+    const labelX = two ? cxs[i] + (i === 0 ? -1 : 1) * rx * 0.4 : cxs[i];
+    svg.appendChild(textEl(labelX, cy - ry - 8, s.label, { 'font-size': 13, 'font-weight': 'bold' }));
+    if (!solo[i].length) return;
+    if (two) {
+      drawVennLines(svg, solo[i], cy, (y) => (i === 0 ? cxs[0] - edge(y) + d / 2 : cxs[1] + edge(y) - d / 2));
+    } else {
+      drawVennLines(svg, solo[i], cy, () => cxs[0]);
+    }
+  });
+  if (both.length) drawVennLines(svg, both, cy, () => W / 2);
+  return svg;
+}
+
+// 3 เซต: วงกลมวางเป็นสามเหลี่ยมด้านเท่า ด้าน = r ข้อความของแต่ละเซตอยู่ในส่วนเฉพาะด้านนอก
+function renderVenn3(spec, sets) {
+  let r = 80;
+  let lines;
+  for (; r <= 150; r += 10) {
+    lines = sets.map((s) => vennLines(s.items, r * 0.75));
+    if (Math.max(...lines.map(vennBlockHeight)) <= r * 0.6) break;
+  }
+  r = Math.min(r, 150);
+  const dist = r / Math.sqrt(3);
+  const dirs = [[-Math.sqrt(3) / 2, -0.5], [Math.sqrt(3) / 2, -0.5], [0, 1]];
+  const margin = 24;
+  const top = spec.universe ? 52 : 34;
+  const W = Math.round(2 * (dist * Math.sqrt(3) / 2 + r) + margin * 2);
+  const H = Math.round(top + (dist * 0.5 + r) + (dist + r) + margin + 16);
+  const gx = W / 2;
+  const gy = top + dist * 0.5 + r;
+  const svg = baseSvg(W, H);
+  if (spec.universe) {
+    svg.appendChild(svgEl('rect', { x: 5, y: 5, width: W - 10, height: H - 10, fill: 'none', stroke: MATH_STROKE, 'stroke-width': 1.5 }));
+    svg.appendChild(textEl(16, 22, spec.universe, { 'font-size': 11, 'text-anchor': 'start' }));
+  }
+  sets.forEach((s, i) => {
+    const color = PALETTE[i % PALETTE.length];
+    const [ux, uy] = dirs[i];
+    svg.appendChild(svgEl('circle', { cx: gx + ux * dist, cy: gy + uy * dist, r, fill: color, opacity: 0.25, stroke: color, 'stroke-width': 2 }));
+  });
+  sets.forEach((s, i) => {
+    const [ux, uy] = dirs[i];
+    const labelX = i === 2 ? gx : gx + ux * (dist + r * 0.55);
+    const labelY = i === 2 ? gy + dist + r + 16 : gy + uy * dist - r - 8;
+    svg.appendChild(textEl(labelX, labelY, s.label, { 'font-size': 13, 'font-weight': 'bold' }));
+    if (lines[i].length) {
+      const t = dist + r * 0.5;
+      drawVennLines(svg, lines[i], gy + uy * t, () => gx + ux * t);
+    }
+  });
+  return svg;
+}
 
 // ===================== tree (probability / classification / factor tree) =====================
 registerDiagram({

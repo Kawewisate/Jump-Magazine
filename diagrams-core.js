@@ -304,18 +304,32 @@ function attachLocalDefs(svg) {
   svg.insertBefore(markerDefs.cloneNode(true), svg.firstChild);
 }
 
-function wrapTextLines(text, maxWidth, fontSize = 14) {
+// ภาษาไทยไม่เว้นวรรคระหว่างคำ: ตัดเป็นคำด้วย Intl.Segmenter (ไม่มีก็ตัดทีละตัวอักษร)
+let thaiSegmenter;
+function splitWordPieces(word) {
+  if (!/[฀-๿]/.test(word)) return [word];
+  if (thaiSegmenter === undefined) {
+    thaiSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+  }
+  if (!thaiSegmenter) return Array.from(word);
+  return Array.from(thaiSegmenter.segment(word), (s) => s.segment);
+}
+
+function wrapTextLines(text, maxWidth, fontSize = 14, fontWeight = 'normal') {
   const words = String(text).split(/\s+/).filter(Boolean);
   const lines = [];
   let cur = '';
+  const fits = (s) => measureTextWidth(s, fontSize, fontWeight) <= maxWidth;
   for (const w of words) {
-    const candidate = cur ? cur + ' ' + w : w;
-    if (measureTextWidth(candidate, fontSize) > maxWidth && cur) {
+    splitWordPieces(w).forEach((piece, i) => {
+      const candidate = cur ? cur + (i === 0 ? ' ' : '') + piece : piece;
+      if (!cur || fits(candidate)) {
+        cur = candidate;
+        return;
+      }
       lines.push(cur);
-      cur = w;
-    } else {
-      cur = candidate;
-    }
+      cur = piece;
+    });
   }
   if (cur) lines.push(cur);
   return lines.length ? lines : [''];
