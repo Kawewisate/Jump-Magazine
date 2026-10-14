@@ -169,6 +169,93 @@ function measureTextWidth(text, fontSize = 14, fontWeight = 'normal') {
   return measureCtx.measureText(String(text)).width;
 }
 
+// ---------- ตัวจัดวางป้ายกันข้อความทับกัน ----------
+// ป้ายแต่ละอันมีตำแหน่งให้เลือกหลายจุด (candidates) ตัวจัดวางจะเลือกจุดแรกที่ไม่ทับ
+// ป้ายอื่น/เส้น/จุด และไม่ล้นขอบรูป ถ้าไม่มีจุดว่างเลยจะเลือกจุดที่ทับน้อยที่สุด
+// (ป้าย optional ที่ยังไงก็ทับป้ายอื่นจะถูกตัดทิ้ง ดีกว่าวาดซ้อนจนอ่านไม่ออก)
+function textBox(x, y, text, fontSize, anchor) {
+  let w;
+  try {
+    w = measureTextWidth(text, fontSize);
+  } catch {
+    w = String(text).length * fontSize * 0.6;
+  }
+  const left = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+  return { x1: left, y1: y - fontSize * 0.8, x2: left + w, y2: y + fontSize * 0.25 };
+}
+
+function boxOverlapArea(a, b) {
+  const w = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
+  const h = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+// Liang–Barsky: ส่วนของเส้นตรงตัดผ่านกล่องหรือไม่
+function segmentHitsBox(x1, y1, x2, y2, b) {
+  let t0 = 0, t1 = 1;
+  const dx = x2 - x1, dy = y2 - y1;
+  const checks = [[-dx, x1 - b.x1], [dx, b.x2 - x1], [-dy, y1 - b.y1], [dy, b.y2 - y1]];
+  for (const [p, q] of checks) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const r = q / p;
+      if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+      else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+  }
+  return true;
+}
+
+function createLabelPlacer(width, height, { margin = 2 } = {}) {
+  const placed = [];
+  const segments = [];
+  const boxes = [];
+  const grow = (b, m) => ({ x1: b.x1 - m, y1: b.y1 - m, x2: b.x2 + m, y2: b.y2 + m });
+
+  function cost(box, m) {
+    let c = 0;
+    if (box.x1 < 0 || box.y1 < 0 || box.x2 > width || box.y2 > height) c += 10000;
+    const padded = grow(box, m);
+    for (const p of placed) {
+      const a = boxOverlapArea(padded, p);
+      if (a > 0) c += 1000 + a;
+    }
+    for (const b of boxes) if (boxOverlapArea(padded, b) > 0) c += 60;
+    for (const s of segments) if (segmentHitsBox(s[0], s[1], s[2], s[3], padded)) c += 40;
+    return c;
+  }
+
+  return {
+    addSegment(x1, y1, x2, y2) { segments.push([x1, y1, x2, y2]); },
+    addPolyline(pts) {
+      for (let i = 1; i < pts.length; i++) segments.push([pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]]);
+    },
+    addBox(x1, y1, x2, y2) { boxes.push({ x1, y1, x2, y2 }); },
+    // candidates: [{x, y, anchor}] เรียงตามลำดับที่อยากได้ — คืน text element หรือ null (ถ้า optional แล้วไม่มีที่ลง)
+    // clearance: ระยะห่างขั้นต่ำจากของอื่น (ป้ายที่ไม่สำคัญควรเว้นมากหน่อยจะได้ไม่ดูเบียด)
+    place(text, candidates, { fontSize = 12, optional = false, clearance = margin, ...attrs } = {}) {
+      if (text == null || text === '' || !candidates.length) return null;
+      let best = null;
+      for (const c of candidates) {
+        const box = textBox(c.x, c.y, text, fontSize, c.anchor || 'middle');
+        const score = cost(box, clearance);
+        if (!best || score < best.score) best = { c, box, score };
+        if (score === 0) break;
+      }
+      if (optional && best.score >= 1000) return null;
+      placed.push(best.box);
+      return textEl(best.c.x, best.c.y, text, { 'font-size': fontSize, 'text-anchor': best.c.anchor || 'middle', ...attrs });
+    },
+  };
+}
+
+let clipIdSeq = 0;
+function nextClipId(prefix = 'clip') {
+  clipIdSeq += 1;
+  return `${prefix}-${clipIdSeq}`;
+}
+
 function arrow(x1, y1, x2, y2, attrs = {}) {
   const { color = DIAGRAM_COLORS.ink, width = 2, markerId = ensureArrowMarker(color), dash } = attrs;
   return svgEl('line', {
