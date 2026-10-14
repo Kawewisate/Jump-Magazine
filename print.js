@@ -90,10 +90,120 @@ async function ensureHtml2pdf() {
   if (typeof window.html2pdf !== 'function') throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
 }
 
-// สร้างไฟล์ PDF ตรงจากเนื้อหาในพรีวิว ด้วย html2pdf.js (html2canvas + jsPDF)
-// เลือกวิธีนี้แทนการพึ่ง window.print()/Ctrl+P เพราะเบราว์เซอร์ (โดยเฉพาะ Chrome)
-// มีบั๊กเรื่องการแบ่งหน้าพิมพ์กับ element ที่ตั้ง overflow ไว้ ทำให้ได้ PDF หน้าเปล่า/ไม่ครบ
-// วิธีนี้ควบคุมการแบ่งหน้าเองทั้งหมด ไม่พึ่ง print engine ของเบราว์เซอร์
+// เอกสาร PDF ใช้ html2canvas + jsPDF ตรงๆ (ไม่ผ่าน html2pdf) เพื่อคุมจุดตัดหน้าเอง
+async function ensurePdfLibs() {
+  try {
+    await Promise.all([
+      typeof window.html2canvas === 'function'
+        || loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'),
+      (window.jspdf && window.jspdf.jsPDF)
+        || loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'),
+    ]);
+  } catch {
+    // ตกไปที่ข้อความ error ด้านล่าง
+  }
+  if (typeof window.html2canvas !== 'function' || !(window.jspdf && window.jspdf.jsPDF)) {
+    throw new Error('ไม่พบไลบรารีสร้าง PDF กรุณารีโหลดหน้าแล้วลองใหม่');
+  }
+}
+
+const PDF_MM_TO_PX = 96 / 25.4;
+const PDF_MARGIN_MM = 15;
+const PDF_CONTENT_W_MM = 210 - PDF_MARGIN_MM * 2;
+const PDF_CONTENT_H_MM = 297 - PDF_MARGIN_MM * 2;
+const PDF_SCALE = 2;
+// canvas ของ Chrome สูงได้ไม่เกิน ~32k px จึง render ทีละก้อนหลายหน้า แทนการถ่ายทั้งเอกสารรวดเดียว
+const PDF_CHUNK_MAX_PX = 7000;
+
+// กล่องที่ห้ามตัดกลาง: บรรทัดข้อความทีละบรรทัด + สูตร/รูป/แถวตาราง ทั้งก้อน (พิกัดเทียบขอบบนของหน้า)
+function collectUnbreakableRects(root) {
+  const originTop = root.getBoundingClientRect().top;
+  const rects = [];
+  const push = (r) => {
+    if (r.height > 0 && r.width > 0) rects.push({ top: r.top - originTop, bottom: r.bottom - originTop });
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.nodeValue.trim()) continue;
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) push(r);
+  }
+  root.querySelectorAll('img, svg, canvas, hr, tr, .katex, .katex-display, figure.diagram').forEach((el) => {
+    push(el.getBoundingClientRect());
+  });
+  return rects;
+}
+
+// html2canvas วาด SVG inline แล้วโดนครอปขอบขวาหาย จึงแปลงรูป diagram เป็น <img> ขนาดเท่าที่แสดงจริงก่อน
+// (ข้าม SVG ที่มี foreignObject เพราะวาดลง canvas แล้ว canvas จะ taint ส่งออกไม่ได้)
+async function rasterizeSvgsForPdf(root) {
+  const jobs = [];
+  root.querySelectorAll('svg').forEach((svg) => {
+    if (svg.parentElement.closest('svg, .katex') || svg.querySelector('foreignObject')) return;
+    const r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const style = getComputedStyle(svg);
+    const copy = svg.cloneNode(true);
+    copy.setAttribute('width', r.width);
+    copy.setAttribute('height', r.height);
+    if (!copy.getAttribute('xmlns')) copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const img = new Image();
+    img.style.cssText = `display:${style.display === 'inline' ? 'inline-block' : style.display};width:${r.width}px;height:${r.height}px;margin:${style.margin};vertical-align:${style.verticalAlign}`;
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy));
+    jobs.push(img.decode().then(() => svg.replaceWith(img), () => {}));
+  });
+  await Promise.all(jobs);
+}
+
+// หาจุดตัดหน้า: ตัดได้เฉพาะช่องว่างระหว่างบรรทัด และไม่ปล่อยหัวข้อค้างไว้ท้ายหน้าโดยไม่มีเนื้อหาตาม
+// rects/headings = [{top,bottom}] หน่วย px; คืน [[start,end], ...] ของแต่ละหน้า
+function computePageSlices(rects, headings, totalHeight, pageHeight) {
+  const sorted = rects.slice().sort((a, b) => a.top - b.top);
+  const merged = [];
+  for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && r.top < last.bottom) last.bottom = Math.max(last.bottom, r.bottom);
+    else merged.push({ top: r.top, bottom: r.bottom });
+  }
+  // ช่องว่างที่ตัดได้ (ระหว่างก้อนเนื้อหาที่ติดกัน)
+  const gaps = [];
+  for (let i = 1; i < merged.length; i++) {
+    gaps.push({ top: merged[i - 1].bottom, bottom: merged[i].top });
+  }
+  const cutInGap = (gap, limit) => Math.min((gap.top + gap.bottom) / 2, limit);
+  const minPage = pageHeight * 0.3;
+
+  const slices = [];
+  let start = 0;
+  while (totalHeight - start > pageHeight + 0.5) {
+    const limit = start + pageHeight;
+    let cut = null;
+    for (let i = gaps.length - 1; i >= 0; i--) {
+      const gap = gaps[i];
+      if (gap.top >= limit) continue;
+      if (gap.top <= start + 1) break;
+      cut = cutInGap(gap, limit);
+      // หัวข้อที่เป็นเนื้อหาสุดท้ายก่อนจุดตัด → ย้ายหัวข้อไปขึ้นหน้าใหม่พร้อมเนื้อหา
+      const orphan = headings.find((h) => h.top > start + minPage && h.bottom <= gap.top + 0.5 && h.bottom >= gap.top - 0.5);
+      if (orphan) {
+        const before = gaps.slice(0, i).reverse().find((g) => g.bottom <= orphan.top + 0.5);
+        if (before && before.top > start + minPage) cut = cutInGap(before, limit);
+      }
+      break;
+    }
+    // ไม่มีช่องให้ตัดเลย (เช่นรูปเดียวสูงเกินหน้า) → จำใจตัดที่ขอบหน้า
+    if (cut == null || cut <= start + 1) cut = limit;
+    slices.push([start, cut]);
+    start = cut;
+  }
+  slices.push([start, totalHeight]);
+  return slices;
+}
+
+// สร้างไฟล์ PDF ตรงจากเนื้อหาในพรีวิว ด้วย html2canvas + jsPDF
+// ไม่พึ่ง window.print()/Ctrl+P เพราะ Chrome มีบั๊กแบ่งหน้าพิมพ์กับ element ที่ตั้ง overflow ไว้
+// และไม่ใช้วิธี html2pdf ที่หั่นภาพยาวทุกๆ 297mm แบบไม่ดูเนื้อหา (บรรทัดโดนตัดครึ่งระหว่างหน้า)
 async function exportPdf() {
   const pageEl = document.getElementById('print-page');
   const btn = document.getElementById('print-btn');
@@ -103,24 +213,102 @@ async function exportPdf() {
   const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ กำลังสร้าง PDF...';
+  let host = null;
   try {
-    await ensureHtml2pdf();
+    await ensurePdfLibs();
     const printBody = document.getElementById('print-body');
     if (printBody.diagramsReady) await printBody.diagramsReady.catch(() => {});
-    pageEl.classList.add('exporting-pdf');
-    const opt = {
-      filename,
-      margin: [15, 15, 15, 15],
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-    };
-    await html2pdf().set(opt).from(pageEl).save();
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+
+    // จัดหน้าใหม่บนสำเนาที่กว้างเท่าพื้นที่พิมพ์ A4 จริง (สำเนาใช้ id เดิมเพื่อให้ CSS เดิมยังมีผล)
+    const contentW = PDF_CONTENT_W_MM * PDF_MM_TO_PX;
+    const pageH = PDF_CONTENT_H_MM * PDF_MM_TO_PX;
+    host = document.createElement('div');
+    host.className = 'pdf-export-host';
+    host.style.width = contentW + 'px';
+    const clone = pageEl.cloneNode(true);
+    clone.classList.add('exporting-pdf');
+    clone.querySelectorAll('.diagram-edit-btn').forEach((b) => b.remove());
+    const srcCanvases = pageEl.querySelectorAll('canvas');
+    clone.querySelectorAll('canvas').forEach((c, i) => {
+      const src = srcCanvases[i];
+      if (src && src.width && src.height) c.getContext('2d').drawImage(src, 0, 0);
+    });
+    host.appendChild(clone);
+    document.body.appendChild(host);
+
+    await rasterizeSvgsForPdf(clone);
+
+    // สูตร display ที่ยาวเกินความกว้างกระดาษ: ย่อฟอนต์ให้พอดีแทนการโดนตัดขอบขวา
+    clone.querySelectorAll('.katex-display').forEach((d) => {
+      const k = d.querySelector('.katex');
+      if (k && k.scrollWidth > d.clientWidth + 1) {
+        const size = parseFloat(getComputedStyle(k).fontSize);
+        k.style.fontSize = (size * d.clientWidth / k.scrollWidth * 0.98) + 'px';
+      }
+    });
+
+    const totalH = Math.ceil(clone.getBoundingClientRect().height);
+    const originTop = clone.getBoundingClientRect().top;
+    const headings = Array.from(clone.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((h) => {
+      const r = h.getBoundingClientRect();
+      return { top: r.top - originTop, bottom: r.bottom - originTop };
+    });
+    // ใช้กล่องของบรรทัดหัวข้อจริง (ไม่รวม margin) เป็นตัวเทียบกับช่องว่าง
+    const rects = collectUnbreakableRects(clone);
+    const headingLines = headings.map((h) => {
+      const inside = rects.filter((r) => r.top >= h.top - 0.5 && r.bottom <= h.bottom + 0.5);
+      return inside.length
+        ? { top: Math.min(...inside.map((r) => r.top)), bottom: Math.max(...inside.map((r) => r.bottom)) }
+        : h;
+    });
+    const slices = computePageSlices(rects, headingLines, totalH, pageH);
+
+    // รวมหน้าที่ติดกันเป็นก้อนเพื่อ render ทีละก้อน
+    const chunks = [];
+    for (const slice of slices) {
+      const last = chunks[chunks.length - 1];
+      if (last && slice[1] - last.start <= PDF_CHUNK_MAX_PX) last.slices.push(slice);
+      else chunks.push({ start: slice[0], slices: [slice] });
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    let first = true;
+    for (const chunk of chunks) {
+      const end = chunk.slices[chunk.slices.length - 1][1];
+      host.style.height = Math.ceil(end - chunk.start) + 'px';
+      clone.style.marginTop = -chunk.start + 'px';
+      const canvas = await html2canvas(host, {
+        scale: PDF_SCALE,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+      });
+      for (const [s, e] of chunk.slices) {
+        const sy = Math.round((s - chunk.start) * PDF_SCALE);
+        const sh = Math.min(Math.round((e - s) * PDF_SCALE), canvas.height - sy);
+        if (sh <= 0) continue;
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sh;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, sh);
+        ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
+        if (!first) pdf.addPage();
+        first = false;
+        const hMm = sh / PDF_SCALE / PDF_MM_TO_PX;
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_CONTENT_W_MM, hMm);
+      }
+    }
+    pdf.save(filename);
   } catch (err) {
     alert('สร้าง PDF ไม่สำเร็จ: ' + (err.message || String(err)));
   } finally {
-    pageEl.classList.remove('exporting-pdf');
+    if (host) host.remove();
     btn.disabled = false;
     btn.textContent = originalLabel;
   }

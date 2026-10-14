@@ -51,6 +51,21 @@ test('literal math placeholders do not collide with formula placeholders', () =>
   assert.match(context.markdownToSafeHtml('x $a+b$'), /x \$a\+b\$/);
 });
 
+test('pdf page cuts land between lines and keep headings with their content', () => {
+  const { computePageSlices } = load('print.js');
+  // บรรทัดสูง 20px ห่างกัน 10px: 0-20, 30-50, ..., บรรทัดที่ 4 (90-110) คร่อมขอบหน้า 100px
+  const lines = Array.from({ length: 10 }, (_, i) => ({ top: i * 30, bottom: i * 30 + 20 }));
+  const slices = computePageSlices(lines, [], 290, 100);
+  for (const [, end] of slices.slice(0, -1)) {
+    assert.ok(lines.every((l) => end <= l.top || end >= l.bottom), `cut ${end} splits a line`);
+  }
+  assert.deepEqual(Array.from(slices[0]), [0, 85]);
+
+  // หัวข้อ (60-80) เป็นบรรทัดสุดท้ายก่อนจุดตัด → ต้องย้ายไปหน้าถัดไป
+  const withHeading = computePageSlices(lines, [{ top: 60, bottom: 80 }], 290, 100);
+  assert.deepEqual(Array.from(withHeading[0]), [0, 55]);
+});
+
 test('malformed or wrongly shaped history degrades to an empty session list', () => {
   const context = load('storage.js', {
     localStorage: { getItem: () => '{"bad":true}' },

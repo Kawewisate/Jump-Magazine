@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teacher-ai-shell-v5';
+const CACHE_NAME = 'teacher-ai-shell-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -40,7 +40,7 @@ const OPTIONAL_CDN = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL).then(() =>
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL.map((url) => new Request(url, { cache: 'reload' }))).then(() =>
     // CDN libs are best-effort so an offline/blocked CDN never fails the install.
     Promise.allSettled(OPTIONAL_CDN.map((url) => cache.add(url)))
   )));

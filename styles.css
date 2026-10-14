@@ -614,6 +614,21 @@ figure.diagram-fallback {
 }
 #print-page.exporting-pdf .katex-display { overflow: visible; }
 
+/* สำเนาที่ใช้จัดหน้า PDF: ซ่อนไว้หลังแอป กว้างเท่าพื้นที่พิมพ์ A4 (ตั้งใน print.js) */
+.pdf-export-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: #fff;
+  pointer-events: none;
+}
+/* letter-spacing ไม่เป็นศูนย์ทำให้ html2canvas วาดทีละตัวอักษรตามตำแหน่งจริง
+   ไม่งั้นข้อความไทย (ไม่มีเว้นวรรค) จะถูกวาดเป็นก้อนยาวแล้วเลื่อนทับกัน */
+.pdf-export-host #print-page,
+.pdf-export-host #print-page * { letter-spacing: 0.01px !important; }
+
 .hidden { display: none !important; }
 
 /* ---------- Print media ---------- */

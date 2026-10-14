@@ -196,8 +196,15 @@ html[data-theme="night"] #print-page.exporting-pdf #print-body,
 html[data-theme="night"] #print-page.exporting-pdf #print-body p,
 html[data-theme="night"] #print-page.exporting-pdf #print-body li,
 html[data-theme="night"] #print-page.exporting-pdf #print-body td,
+html[data-theme="night"] #print-page.exporting-pdf #print-body strong,
 html[data-theme="night"] #print-page.exporting-pdf #print-body .katex,
 html[data-theme="night"] #print-page.exporting-pdf #print-body .katex * { color: #163f59; }
+html[data-theme="night"] #print-page.exporting-pdf #print-body code,
+html[data-theme="night"] #print-page.exporting-pdf #print-body pre {
+  color: #163f59;
+  background: #F0EBE1;
+  border-color: transparent;
+}
 
 /* Export and browser printing stay paper-friendly even if the app itself is
    in Night Aero.  Reset both the card and inherited SVG palette explicitly. */
