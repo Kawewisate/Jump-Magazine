@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teacher-ai-shell-v4';
+const CACHE_NAME = 'teacher-ai-shell-v5';
 const APP_SHELL = [
   './',
   './index.html',
