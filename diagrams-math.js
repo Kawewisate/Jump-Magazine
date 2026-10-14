@@ -35,6 +35,17 @@ registerDiagram({
     const sx = (x) => pad + ((x - xMin) / (xMax - xMin)) * plotW;
     const sy = (y) => H - pad - ((y - yMin) / (yMax - yMin)) * plotH;
     const svg = baseSvg(W, H);
+    // ป้ายทั้งหมดเก็บไว้วางทีหลังสุด ให้ตัวจัดวางรู้ว่ามีเส้น/จุดอะไรอยู่ตรงไหนแล้วบ้าง
+    const placer = createLabelPlacer(W, H);
+    const labels = [];
+
+    // เส้นกราฟถูกตัดให้อยู่ในกรอบพล็อต (ไม่ให้พุ่งออกไปทับป้าย/ขอบรูป)
+    const clipId = nextClipId('graph-plot');
+    svg.appendChild(svgEl('defs', {}, [
+      svgEl('clipPath', { id: clipId }, [svgEl('rect', { x: pad, y: pad, width: plotW, height: plotH })]),
+    ]));
+    const clipped = svgEl('g', { 'clip-path': `url(#${clipId})` });
+    const inPlot = ([x, y]) => x >= pad - 1 && x <= W - pad + 1 && y >= pad - 1 && y <= H - pad + 1;
 
     if (spec.grid !== false) {
       for (let gx = Math.ceil(xMin); gx <= xMax; gx++) {
@@ -49,19 +60,38 @@ registerDiagram({
     const y0 = sy(Math.max(yMin, Math.min(0, yMax)));
     svg.appendChild(arrow(pad, y0, W - pad, y0, { color: MATH_STROKE }));
     svg.appendChild(arrow(x0, H - pad, x0, pad, { color: MATH_STROKE }));
-    svg.appendChild(textEl(W - pad + 12, y0 + 4, spec.xLabel || 'x', { 'font-size': 12 }));
-    svg.appendChild(textEl(x0, pad - 10, spec.yLabel || 'y', { 'font-size': 12 }));
-    svg.appendChild(textEl(x0 - 10, y0 + 14, '0', { 'font-size': 11, fill: DIAGRAM_COLORS.muted }));
+    placer.addSegment(pad, y0, W - pad, y0);
+    placer.addSegment(x0, H - pad, x0, pad);
+    placer.addBox(W - pad - 10, y0 - 5, W - pad + 3, y0 + 5); // หัวลูกศรแกน x
+    placer.addBox(x0 - 5, pad - 3, x0 + 5, pad + 10); // หัวลูกศรแกน y
 
     function colorFor(name, i) {
       const map = { accent: PALETTE[0], blue: PALETTE[1], green: PALETTE[2], purple: PALETTE[3] };
       return map[name] || PALETTE[i % PALETTE.length];
     }
 
+    // ตำแหน่งรอบจุด (px, py) — 8 ทิศ เริ่มจากขวาบน
+    function around(px, py, gap = 8, fontSize = 12) {
+      const up = py - gap, down = py + gap + fontSize * 0.8, mid = py + fontSize * 0.35;
+      return [
+        { x: px + gap, y: up, anchor: 'start' },
+        { x: px - gap, y: up, anchor: 'end' },
+        { x: px + gap, y: down, anchor: 'start' },
+        { x: px - gap, y: down, anchor: 'end' },
+        { x: px + gap + 2, y: mid, anchor: 'start' },
+        { x: px - gap - 2, y: mid, anchor: 'end' },
+        { x: px, y: up - 2, anchor: 'middle' },
+        { x: px, y: down + 2, anchor: 'middle' },
+      ];
+    }
+
+    const functionRuns = [];
     (spec.functions || []).forEach((f, i) => {
       const color = colorFor(f.color, i);
       const n = 200;
       let d = '';
+      let penDown = false;
+      const runs = [];
       let node;
       try {
         node = window.math ? window.math.compile(f.expr) : null;
@@ -77,42 +107,144 @@ registerDiagram({
           y = NaN;
         }
         if (!isFinite(y) || y < yMin - (yMax - yMin) || y > yMax + (yMax - yMin)) {
-          d += '';
+          penDown = false;
           continue;
         }
-        d += (d === '' || d.endsWith(' M') ? 'M' : 'L') + sx(x).toFixed(1) + ',' + sy(Math.max(yMin - 1, Math.min(yMax + 1, y))).toFixed(1) + ' ';
+        const pt = [sx(x), sy(Math.max(yMin - 1, Math.min(yMax + 1, y)))];
+        if (!penDown) runs.push([]);
+        runs[runs.length - 1].push(pt);
+        d += (penDown ? 'L' : 'M') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1) + ' ';
+        penDown = true;
       }
-      if (d.trim()) svg.appendChild(svgEl('path', { d, fill: 'none', stroke: color, 'stroke-width': 2 }));
-      if (f.label) svg.appendChild(textEl(W - pad - 4, pad + 14 + i * 16, f.label, { fill: color, 'font-size': 12, 'text-anchor': 'end' }));
+      if (d.trim()) clipped.appendChild(svgEl('path', { d, fill: 'none', stroke: color, 'stroke-width': 2 }));
+      runs.forEach((r) => placer.addPolyline(r));
+      functionRuns.push({ f, i, color, runs });
     });
 
     (spec.polylines || []).forEach((pl, i) => {
       const color = colorFor(pl.color, i + (spec.functions || []).length);
-      const pts = (pl.points || []).map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ');
-      svg.appendChild(svgEl('polyline', { points: pts, fill: 'none', stroke: color, 'stroke-width': 2 }));
-      (pl.points || []).forEach(([x, y]) => svg.appendChild(svgEl('circle', { cx: sx(x), cy: sy(y), r: 3, fill: color })));
-      if (pl.label) svg.appendChild(textEl(sx(pl.points[pl.points.length - 1][0]) + 10, sy(pl.points[pl.points.length - 1][1]), pl.label, { fill: color, 'font-size': 12, 'text-anchor': 'start' }));
+      const ptsArr = (pl.points || []).map(([x, y]) => [sx(x), sy(y)]);
+      clipped.appendChild(svgEl('polyline', { points: ptsArr.map((p) => p.join(',')).join(' '), fill: 'none', stroke: color, 'stroke-width': 2 }));
+      ptsArr.forEach(([px, py]) => {
+        clipped.appendChild(svgEl('circle', { cx: px, cy: py, r: 3, fill: color }));
+        placer.addBox(px - 3, py - 3, px + 3, py + 3);
+      });
+      placer.addPolyline(ptsArr);
+      if (pl.label && ptsArr.length) {
+        const [ex, ey] = ptsArr[ptsArr.length - 1];
+        const cands = [{ x: ex + 10, y: ey + 4, anchor: 'start' }, ...around(ex, ey)];
+        // ไล่จุดอื่นของเส้นจากท้ายมาหัว เผื่อปลายเส้นไปชนป้ายแกน
+        for (let k = ptsArr.length - 2; k >= 0; k--) cands.push(...around(ptsArr[k][0], ptsArr[k][1]));
+        labels.push({ text: pl.label, cands, fill: color });
+      }
     });
+
+    svg.appendChild(clipped);
 
     (spec.lines || []).forEach((l) => {
       if (l.kind === 'vertical') {
-        svg.appendChild(svgEl('line', { x1: sx(l.x), y1: pad, x2: sx(l.x), y2: H - pad, stroke: MATH_ACCENT, 'stroke-width': 1.5, 'stroke-dasharray': '5,3' }));
-        if (l.label) svg.appendChild(textEl(sx(l.x) + 6, pad + 10, l.label, { fill: MATH_ACCENT, 'font-size': 11, 'text-anchor': 'start' }));
+        const lx = sx(l.x);
+        svg.appendChild(svgEl('line', { x1: lx, y1: pad, x2: lx, y2: H - pad, stroke: MATH_ACCENT, 'stroke-width': 1.5, 'stroke-dasharray': '5,3' }));
+        placer.addSegment(lx, pad, lx, H - pad);
+        if (l.label) {
+          const cands = [
+            { x: lx + 7, y: pad + 12, anchor: 'start' },
+            { x: lx - 7, y: pad + 12, anchor: 'end' },
+            { x: lx, y: pad - 6, anchor: 'middle' },
+            { x: lx + 7, y: H - pad - 6, anchor: 'start' },
+            { x: lx - 7, y: H - pad - 6, anchor: 'end' },
+            { x: lx, y: H - pad + 16, anchor: 'middle' },
+          ];
+          for (const t of [0.25, 0.5, 0.75]) {
+            const ly = pad + plotH * t;
+            cands.push({ x: lx + 7, y: ly, anchor: 'start' }, { x: lx - 7, y: ly, anchor: 'end' });
+          }
+          labels.push({ text: l.label, cands, fill: MATH_ACCENT, fontSize: 11 });
+        }
       } else if (l.kind === 'horizontal') {
-        svg.appendChild(svgEl('line', { x1: pad, y1: sy(l.y), x2: W - pad, y2: sy(l.y), stroke: MATH_ACCENT, 'stroke-width': 1.5, 'stroke-dasharray': '5,3' }));
-        if (l.label) svg.appendChild(textEl(pad + 6, sy(l.y) - 6, l.label, { fill: MATH_ACCENT, 'font-size': 11, 'text-anchor': 'start' }));
+        const ly = sy(l.y);
+        svg.appendChild(svgEl('line', { x1: pad, y1: ly, x2: W - pad, y2: ly, stroke: MATH_ACCENT, 'stroke-width': 1.5, 'stroke-dasharray': '5,3' }));
+        placer.addSegment(pad, ly, W - pad, ly);
+        if (l.label) {
+          const cands = [
+            { x: pad + 6, y: ly - 6, anchor: 'start' },
+            { x: pad + 6, y: ly + 14, anchor: 'start' },
+            { x: W - pad - 6, y: ly - 6, anchor: 'end' },
+            { x: W - pad - 6, y: ly + 14, anchor: 'end' },
+            { x: pad - 4, y: ly + 4, anchor: 'end' },
+          ];
+          for (const t of [0.25, 0.5, 0.75]) {
+            const lx = pad + plotW * t;
+            cands.push({ x: lx, y: ly - 6, anchor: 'middle' }, { x: lx, y: ly + 14, anchor: 'middle' });
+          }
+          labels.push({ text: l.label, cands, fill: MATH_ACCENT, fontSize: 11 });
+        }
       }
     });
 
     (spec.points || []).forEach((p) => {
-      svg.appendChild(svgEl('circle', { cx: sx(p.x), cy: sy(p.y), r: 4, fill: MATH_STROKE }));
-      if (p.label) svg.appendChild(textEl(sx(p.x) + 10, sy(p.y) - 8, p.label, { 'font-size': 12, 'text-anchor': 'start' }));
+      const px = sx(p.x), py = sy(p.y);
+      svg.appendChild(svgEl('circle', { cx: px, cy: py, r: 4, fill: MATH_STROKE }));
+      placer.addBox(px - 4, py - 4, px + 4, py + 4);
+      if (p.label) labels.push({ text: p.label, cands: around(px, py, 7), priority: 1 });
     });
 
     (spec.vectors || []).forEach((v) => {
-      svg.appendChild(arrow(sx(v.from ? v.from[0] : 0), sy(v.from ? v.from[1] : 0), sx(v.to[0]), sy(v.to[1]), { color: MATH_LINE2 }));
-      if (v.label) svg.appendChild(textEl(sx(v.to[0]) + 8, sy(v.to[1]), v.label, { fill: MATH_LINE2, 'font-size': 12, 'text-anchor': 'start' }));
+      const fx = sx(v.from ? v.from[0] : 0), fy = sy(v.from ? v.from[1] : 0);
+      const tx = sx(v.to[0]), ty = sy(v.to[1]);
+      svg.appendChild(arrow(fx, fy, tx, ty, { color: MATH_LINE2 }));
+      placer.addSegment(fx, fy, tx, ty);
+      if (v.label) labels.push({ text: v.label, cands: [{ x: tx + 8, y: ty + 4, anchor: 'start' }, ...around(tx, ty)], fill: MATH_LINE2 });
     });
+
+    // ป้ายชื่อฟังก์ชัน: ลองมุมกรอบแบบ legend ก่อน แล้วค่อยลองวางติดเส้นกราฟ
+    functionRuns.forEach(({ f, i, color, runs }) => {
+      if (!f.label) return;
+      const row = 14 + i * 16;
+      const cands = [
+        { x: W - pad - 4, y: pad + row, anchor: 'end' },
+        { x: pad + 4, y: pad + row, anchor: 'start' },
+        { x: W - pad - 4, y: H - pad - 6 - i * 16, anchor: 'end' },
+        { x: pad + 4, y: H - pad - 6 - i * 16, anchor: 'start' },
+      ];
+      const pts = runs.flat().filter(inPlot);
+      for (const t of [0.85, 0.7, 0.15, 0.3, 0.55]) {
+        if (!pts.length) break;
+        const [px, py] = pts[Math.min(pts.length - 1, Math.floor(pts.length * t))];
+        cands.push(...around(px, py, 8));
+      }
+      labels.push({ text: f.label, cands, fill: color });
+    });
+
+    // วางตามลำดับความสำคัญ: ชื่อแกน → จุด → ป้ายอื่น → "0" (ถ้าไม่มีที่ว่างก็ไม่ต้องใส่)
+    const axisFont = { 'font-size': 12 };
+    const xl = placer.place(spec.xLabel || 'x', [
+      { x: W - pad + 8, y: y0 + 4, anchor: 'start' },
+      { x: W - pad, y: y0 + 18, anchor: 'end' },
+      { x: W - pad, y: y0 - 10, anchor: 'end' },
+    ], axisFont);
+    const yl = placer.place(spec.yLabel || 'y', [
+      { x: x0, y: pad - 12, anchor: 'middle' },
+      { x: x0 + 10, y: pad - 6, anchor: 'start' },
+      { x: x0 - 10, y: pad - 6, anchor: 'end' },
+    ], axisFont);
+    [xl, yl].forEach((t) => t && svg.appendChild(t));
+
+    labels.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    labels.forEach((lb) => {
+      const t = placer.place(lb.text, lb.cands, { fontSize: lb.fontSize || 12, fill: lb.fill });
+      if (t) svg.appendChild(t);
+    });
+
+    // ถ้ามีจุดที่ผู้ใช้ใส่ป้ายไว้ตรงจุดกำเนิดอยู่แล้ว (เช่น "O") ไม่ต้องใส่ "0" ซ้ำ
+    const originTaken = (spec.points || []).some((p) => p.label && Math.hypot(sx(p.x) - x0, sy(p.y) - y0) < 6);
+    const zero = originTaken ? null : placer.place('0', [
+      { x: x0 - 6, y: y0 + 14, anchor: 'end' },
+      { x: x0 + 6, y: y0 + 14, anchor: 'start' },
+      { x: x0 - 6, y: y0 - 6, anchor: 'end' },
+      { x: x0 + 6, y: y0 - 6, anchor: 'start' },
+    ], { fontSize: 11, fill: DIAGRAM_COLORS.muted, optional: true, clearance: 4 });
+    if (zero) svg.appendChild(zero);
 
     return svg;
   },
